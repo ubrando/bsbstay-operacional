@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bsbstay-operacional",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./dist/server/server.js",
+  "assets": {
+    "directory": "./dist/client",
+  },
+  // App não usa bindings do Workers (KV/R2/D1) — só chama o Supabase via
+  // HTTP. Por isso o deploy é `vite build && wrangler deploy` direto, sem
+  // o plugin @cloudflare/vite-plugin. Ver DECISIONS.md.
+  //
+  // Painel de custo/uso: Cloudflare Workers tem tier gratuito de 100k
+  // requisições/dia. Para ~50 usuários internos, deve ficar dentro do
+  // gratuito ou próximo de R$0-150/mês no plano pago (Workers Paid, $5/mês
+  // + uso). Ver DECISIONS.md para o comparativo com Railway/Render.
+}

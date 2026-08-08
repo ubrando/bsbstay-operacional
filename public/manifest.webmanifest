@@ -1,0 +1,8 @@
+{
+  "name": "BSB Stay & Help Estadias — Operacional",
+  "short_name": "BSB Operacional",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16233D"
+}
