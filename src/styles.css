@@ -3,28 +3,71 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Em touch não existe mouse-leave pra desfazer :hover — um toque deixa o
+   estilo "grudado" até a pessoa tocar em outro lugar. Como o público
+   principal do app (camareiras) usa só celular, redefine hover: globalmente
+   pra só disparar quando existe ponteiro fino de verdade (mouse), cobrindo
+   toda classe hover: do app de uma vez, não só as tocadas nesta mudança. */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 :root {
   --radius: 0.6rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --primary: oklch(0.35 0.08 250);
-  --primary-foreground: oklch(0.98 0 0);
+  /* Identidade da marca (materiais de venda do cliente) — navy estrutural
+     + dourado como accent de moderação. Valores em hex de propósito (o
+     cliente forneceu hex exato; não converter pra oklch e arredondar). */
+  --primary: #16233d;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.2 0 0);
   --muted: oklch(0.96 0 0);
   --muted-foreground: oklch(0.5 0 0);
   --accent: oklch(0.94 0.02 250);
   --accent-foreground: oklch(0.2 0 0);
+  /* Accent de moderação — CTA/destaque pontual, não pra uso geral. Texto
+     em cima do preenchimento dourado tem que ser --accent-gold-foreground
+     (navy): branco em dourado mede só 3.09:1, abaixo do mínimo AA de
+     4.5:1 pra texto normal. Navy em dourado mede 5.06:1. */
+  --accent-gold: #b08d57;
+  --accent-gold-foreground: #16233d;
   --destructive: oklch(0.58 0.22 27);
   --border: oklch(0.9 0 0);
   --warning: oklch(0.75 0.15 75);
   --success: oklch(0.6 0.15 145);
+  /* Tons derivados de warning/success pra preencher cards inteiros (não só
+     borda/badge pequeno) — o warning/success pastel acima é claro demais
+     pra ficar atrás de texto branco e continuar legível. Medido: branco
+     sobre #92400e = 7.09:1, sobre #166534 = 7.13:1 (mínimo AA é 4.5:1). */
+  --warning-strong: #92400e;
+  --success-strong: #166534;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --input: oklch(0.9 0 0);
-  --ring: oklch(0.35 0.08 250);
+  --ring: #16233d;
+
+  /* Vocabulário de motion — usar sempre estes, nunca duration/ease soltos
+     num componente. ease-out pra qualquer coisa entrando/saindo ou
+     recebendo feedback de toque; ease-in-out só pra algo que já está na
+     tela se movendo/mudando de forma. Mapeados abaixo (@theme inline) por
+     cima dos utilitários ease-out/ease-in-out padrão do Tailwind, então
+     toda classe ease-out/ease-in-out do app já usa a curva certa sem
+     precisar reescrever nada. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* Sombra de elevação pro Card — reforçada (era quase invisível contra
+     fundo branco/cinza claro): contato mais próximo mais escuro + difusão
+     maior mais larga, pra ler como "levantado" de verdade sem ficar pesada. */
+  --shadow-card-elevation: 0 1px 3px 0 oklch(0.145 0 0 / 0.10), 0 4px 12px -2px oklch(0.145 0 0 / 0.12);
 }
 
 @theme inline {
@@ -38,10 +81,14 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-gold-foreground: var(--accent-gold-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-warning: var(--warning);
   --color-success: var(--success);
+  --color-warning-strong: var(--warning-strong);
+  --color-success-strong: var(--success-strong);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-card: var(--card);
@@ -50,6 +97,9 @@
   --color-ring: var(--ring);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
+  --ease-out: var(--ease-out-strong);
+  --ease-in-out: var(--ease-in-out-strong);
+  --shadow-card: var(--shadow-card-elevation);
 }
 
 body {

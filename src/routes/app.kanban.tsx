@@ -256,7 +256,7 @@ function KanbanPage() {
     <div className="max-w-[1600px] mx-auto space-y-3">
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Kanban do dia</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Kanban do dia</h1>
           <p className="text-muted-foreground text-sm">Arraste tarefas entre colunas ou use o menu</p>
         </div>
         <div className="flex items-center gap-2">
@@ -294,10 +294,15 @@ function KanbanPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Input placeholder="Filtrar por unidade..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="h-10 flex-1 min-w-[180px]" />
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+        <Input
+          placeholder="Filtrar por unidade..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="h-10 col-span-2 sm:flex-1 sm:min-w-[180px]"
+        />
         <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-          <SelectTrigger className="h-10 w-auto min-w-[140px]">
+          <SelectTrigger className="h-10 sm:w-auto sm:min-w-[140px]">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -310,7 +315,7 @@ function KanbanPage() {
           </SelectContent>
         </Select>
         <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
-          <SelectTrigger className="h-10 w-auto min-w-[140px]">
+          <SelectTrigger className="h-10 sm:w-auto sm:min-w-[140px]">
             <SelectValue placeholder="Prioridade" />
           </SelectTrigger>
           <SelectContent>
@@ -323,7 +328,7 @@ function KanbanPage() {
           </SelectContent>
         </Select>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="h-10 w-auto min-w-[140px]">
+          <SelectTrigger className="h-10 sm:w-auto sm:min-w-[140px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -336,7 +341,7 @@ function KanbanPage() {
           </SelectContent>
         </Select>
         <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
-          <SelectTrigger className="h-10 w-auto min-w-[160px]">
+          <SelectTrigger className="h-10 sm:w-auto sm:min-w-[160px]">
             <SelectValue placeholder="Responsável" />
           </SelectTrigger>
           <SelectContent>
@@ -484,7 +489,12 @@ function DraggableCard({
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: t.id });
   return (
-    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={{ opacity: isDragging ? 0.4 : 1, transition: "opacity 150ms var(--ease-out-strong)" }}
+      {...attributes}
+      {...listeners}
+    >
       <TarefaCard t={t} unidade={unidade} respMap={respMap} onMover={onMover} filtroStatus={filtroStatus} dia={dia} podeExcluir={podeExcluir} onPedirExclusao={onPedirExclusao} />
     </div>
   );
@@ -523,7 +533,7 @@ function TarefaCard({
 
   return (
     <Card
-      className={`bg-background border-l-4 ${PRIORIDADE_BORDA[t.prioridade] ?? "border-l-muted-foreground/40"} ${dragging ? "shadow-2xl" : "shadow-sm"} touch-none ${destacada ? "" : "opacity-40"}`}
+      className={`bg-background border-l-4 ${PRIORIDADE_BORDA[t.prioridade] ?? "border-l-muted-foreground/40"} ${dragging ? "shadow-2xl" : "shadow-sm"} touch-none transition-opacity duration-200 ease-out ${destacada ? "" : "opacity-40"}`}
     >
       <CardContent className="p-2.5 space-y-1.5">
         <div className="flex items-start justify-between gap-1">

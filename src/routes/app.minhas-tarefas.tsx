@@ -124,7 +124,7 @@ function MinhasTarefas() {
 
   return (
     <div className="max-w-lg mx-auto space-y-3">
-      <h1 className="text-xl font-bold">Minhas tarefas</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Minhas tarefas</h1>
 
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={() => setDia(shiftDay(dia, -1))} aria-label="Dia anterior">
@@ -266,17 +266,34 @@ function TarefaItem({
 
         <div className="flex gap-2 pt-0.5">
           {t.status !== "em_andamento" && t.status !== "concluida" && (
-            <Button size="default" className="flex-1 h-10" onClick={() => onMudarStatus("em_andamento")} disabled={busy}>
+            <Button
+              size="default"
+              className="flex-1 h-10 transition-opacity duration-150 ease-out starting:opacity-0"
+              onClick={() => onMudarStatus("em_andamento")}
+              disabled={busy}
+            >
               <Play className="size-4 mr-1" /> Iniciar
             </Button>
           )}
           {t.status === "em_andamento" && (
-            <Button size="default" variant="outline" className="flex-1 h-10" onClick={() => onMudarStatus("pausada")} disabled={busy}>
+            <Button
+              size="default"
+              variant="outline"
+              className="flex-1 h-10 transition-opacity duration-150 ease-out starting:opacity-0"
+              onClick={() => onMudarStatus("pausada")}
+              disabled={busy}
+            >
               <Pause className="size-4 mr-1" /> Pausar
             </Button>
           )}
           {t.status !== "concluida" && (
-            <Button size="default" variant="outline" className="flex-1 h-10" onClick={() => onMudarStatus("concluida")} disabled={busy}>
+            <Button
+              size="default"
+              variant="outline"
+              className="flex-1 h-10 transition-opacity duration-150 ease-out starting:opacity-0"
+              onClick={() => onMudarStatus("concluida")}
+              disabled={busy}
+            >
               <CheckCircle2 className="size-4 mr-1" /> Concluir
             </Button>
           )}

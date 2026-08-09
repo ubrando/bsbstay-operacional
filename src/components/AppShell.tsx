@@ -10,6 +10,15 @@ import {
 } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, ClipboardList, KanbanSquare, Building2, Users, LogOut, Bell, BarChart3 } from "lucide-react";
+import { IconMenu2 } from "@tabler/icons-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAlertas } from "@/lib/use-alertas";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -41,14 +50,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b flex items-center justify-between px-4 h-14 shrink-0">
-        <div className="font-semibold text-sm">BSB Stay & Help Estadias</div>
-        <nav className="flex items-center gap-1">
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 flex items-center justify-between px-4 h-14 shrink-0 gap-2">
+        <div className="font-semibold text-sm shrink-0">
+          <span className="hidden lg:inline">BSB Stay & Help Estadias</span>
+          <span className="lg:hidden">BSB Stay</span>
+        </div>
+        <nav className="hidden lg:flex items-center gap-1">
           {nav.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md hover:bg-accent text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors duration-100 [&.active]:bg-accent [&.active]:text-foreground"
             >
               <item.icon className="size-4" />
               {item.label}
@@ -62,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           <div className="text-xs text-muted-foreground text-right">
             <div>{user?.email}</div>
             <div>{roles.map((r) => ROLE_LABELS[r]).join(", ")}</div>
@@ -71,6 +83,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LogOut className="size-4" />
           </Button>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menu">
+              <IconMenu2 className="size-5" stroke={1.75} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {nav.map((item) => (
+              <DropdownMenuItem key={item.to} asChild>
+                <Link to={item.to} className="flex items-center gap-2 [&.active]:bg-accent [&.active]:text-foreground">
+                  <item.icon className="size-4" />
+                  <span className="flex-1">{item.label}</span>
+                  {item.to === "/app/alertas" && totalAlertas > 0 && (
+                    <span
+                      className={`inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${alertaUrgente ? "bg-destructive" : "bg-warning"}`}
+                    >
+                      {totalAlertas}
+                    </span>
+                  )}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+              <div className="truncate">{user?.email}</div>
+              <div>{roles.map((r) => ROLE_LABELS[r]).join(", ")}</div>
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+              <LogOut className="size-4" />
+              Sair
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
       <main className="flex-1 p-4">{children}</main>
     </div>
