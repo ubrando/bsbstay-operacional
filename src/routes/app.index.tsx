@@ -1,14 +1,30 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import { useAuth, FRONT_DESK_ROLES } from "@/lib/auth";
 
 export const Route = createFileRoute("/app/")({
   component: Painel,
 });
 
 function Painel() {
+  const { hasAnyRole } = useAuth();
+  const podeCriar = hasAnyRole(FRONT_DESK_ROLES);
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Painel Operacional</h1>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h1 className="text-xl font-semibold">Painel Operacional</h1>
+        {podeCriar && (
+          <Link to="/app/tarefas/nova">
+            <Button size="sm">
+              <Plus className="size-4" />
+              Nova tarefa
+            </Button>
+          </Link>
+        )}
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm text-muted-foreground">Próximos passos de implementação</CardTitle>

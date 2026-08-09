@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, Play, Pause, CheckCircle2, Clock, KeyRound, Plus, Square, CheckSquare, ClipboardCheck } from "lucide-react";
+import { ChevronLeft, Play, Pause, CheckCircle2, Clock, KeyRound, Plus, Square, CheckSquare, ClipboardCheck, Pencil, Trash2, Check, X } from "lucide-react";
 import { TAREFA_TIPO_LABEL, TAREFA_STATUS_LABEL, statusBadgeVariant, formatMin } from "@/lib/domain";
 import { toast } from "sonner";
 import { AtribuirResponsaveis } from "@/components/AtribuirResponsaveis";
@@ -189,6 +189,8 @@ function DemandasVistoria({ tarefaId, tarefaStatus, vistoriadorId }: { tarefaId:
 
   const [novo, setNovo] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editTexto, setEditTexto] = useState("");
 
   async function carregar() {
     const { data, error } = await supabase
@@ -230,6 +232,35 @@ function DemandasVistoria({ tarefaId, tarefaStatus, vistoriadorId }: { tarefaId:
     carregar();
   }
 
+  function iniciarEdicao(item: DemandaItem) {
+    setEditandoId(item.id);
+    setEditTexto(item.texto);
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setEditTexto("");
+  }
+
+  async function salvarEdicao() {
+    if (!editandoId || !editTexto.trim()) return;
+    setBusy(true);
+    const { error } = await supabase.from("vistoria_demandas").update({ texto: editTexto.trim() }).eq("id", editandoId);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    setEditandoId(null);
+    setEditTexto("");
+    carregar();
+  }
+
+  async function remover(item: DemandaItem) {
+    setBusy(true);
+    const { error } = await supabase.from("vistoria_demandas").delete().eq("id", item.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    carregar();
+  }
+
   if (carregando) return null;
   if (itens.length === 0 && !podeEditar) return null;
 
@@ -264,7 +295,46 @@ function DemandasVistoria({ tarefaId, tarefaStatus, vistoriadorId }: { tarefaId:
                 >
                   {d.concluido ? <CheckSquare className="size-5 text-success" /> : <Square className="size-5 text-muted-foreground hover:text-foreground" />}
                 </button>
-                <span className={`text-sm ${d.concluido ? "line-through text-muted-foreground" : ""}`}>{d.texto}</span>
+                {editandoId === d.id ? (
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <Input
+                      value={editTexto}
+                      onChange={(e) => setEditTexto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") salvarEdicao();
+                        if (e.key === "Escape") cancelarEdicao();
+                      }}
+                      autoFocus
+                      className="h-7 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={salvarEdicao}
+                      disabled={busy || !editTexto.trim()}
+                      className="shrink-0 disabled:opacity-50"
+                      aria-label="Salvar"
+                    >
+                      <Check className="size-4 text-success" />
+                    </button>
+                    <button type="button" onClick={cancelarEdicao} disabled={busy} className="shrink-0" aria-label="Cancelar">
+                      <X className="size-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className={`text-sm flex-1 ${d.concluido ? "line-through text-muted-foreground" : ""}`}>{d.texto}</span>
+                    {podeEditar && !concluidaTarefa && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onClick={() => iniciarEdicao(d)} disabled={busy} aria-label="Editar">
+                          <Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
+                        </button>
+                        <button type="button" onClick={() => remover(d)} disabled={busy} aria-label="Excluir">
+                          <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </li>
             ))}
           </ul>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAuth, FRONT_DESK_ROLES, type AppRole } from "@/lib/auth";
+import { useAuth, FRONT_DESK_ROLES } from "@/lib/auth";
+import { useResponsaveisDisponiveis } from "@/lib/use-responsaveis-disponiveis";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { UserPlus, ClipboardCheck } from "lucide-react";
@@ -20,8 +21,6 @@ interface Props {
   bloqueado?: boolean;
 }
 
-const LIMPEZA_TIPOS = ["limpeza_checkout", "limpeza_intermediaria"];
-
 /**
  * Atribui responsáveis a uma tarefa.
  * - Limpeza: 1 camareira responsável + 1 vistoriador previsto.
@@ -30,41 +29,11 @@ const LIMPEZA_TIPOS = ["limpeza_checkout", "limpeza_intermediaria"];
 export function AtribuirResponsaveis({ tarefaId, tipo, vistoriadorId, camareiras, onChange, bloqueado }: Props) {
   const { hasAnyRole } = useAuth();
   const podeEditar = !bloqueado && hasAnyRole(FRONT_DESK_ROLES);
-  const ehLimpeza = LIMPEZA_TIPOS.includes(tipo);
-  const ehVistoria = tipo === "vistoria";
+  const { camareiras: todosCamareiras, vistoriadores: todosVistoriadores, ehLimpeza, ehVistoria } = useResponsaveisDisponiveis(tipo, podeEditar);
 
-  const [todosCamareiras, setTodosCamareiras] = useState<Profile[]>([]);
-  const [todosVistoriadores, setTodosVistoriadores] = useState<Profile[]>([]);
   const [busy, setBusy] = useState(false);
 
   const camareiraAtual = camareiras[0] ?? null;
-
-  useEffect(() => {
-    if (!podeEditar) return;
-    (async () => {
-      const rolesNeeded: AppRole[] = ehLimpeza ? ["camareira", "vistoriador"] : ehVistoria ? ["vistoriador"] : [];
-      if (rolesNeeded.length === 0) return;
-      const { data: ur } = await supabase.from("user_roles").select("user_id, role").in("role", rolesNeeded);
-      const ids = [...new Set((ur ?? []).map((r) => r.user_id))];
-      if (ids.length === 0) {
-        setTodosCamareiras([]);
-        setTodosVistoriadores([]);
-        return;
-      }
-      const { data: profs } = await supabase.from("profiles").select("user_id, nome_completo, ativo").in("user_id", ids);
-      const ativos = (profs ?? []).filter((p) => p.ativo);
-      const byId = new Map(ativos.map((p) => [p.user_id, p.nome_completo]));
-      const cams = (ur ?? [])
-        .filter((r) => r.role === "camareira" && byId.has(r.user_id))
-        .map((r) => ({ user_id: r.user_id, nome_completo: byId.get(r.user_id)! }));
-      const vists = (ur ?? [])
-        .filter((r) => r.role === "vistoriador" && byId.has(r.user_id))
-        .map((r) => ({ user_id: r.user_id, nome_completo: byId.get(r.user_id)! }));
-      const dedup = (xs: Profile[]) => Array.from(new Map(xs.map((x) => [x.user_id, x])).values()).sort((a, b) => a.nome_completo.localeCompare(b.nome_completo));
-      setTodosCamareiras(dedup(cams));
-      setTodosVistoriadores(dedup(vists));
-    })();
-  }, [podeEditar, ehLimpeza, ehVistoria]);
 
   /**
    * Define a camareira responsável (substitui qualquer camareira anterior).

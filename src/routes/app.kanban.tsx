@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useAuth, FRONT_DESK_ROLES } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, KeyRound, Bed, Users as UsersIcon, Moon, Hash } from "lucide-react";
-import { TAREFA_TIPO_LABEL } from "@/lib/domain";
+import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, KeyRound, Bed, Users as UsersIcon, Moon, Hash, Plus } from "lucide-react";
+import { TAREFA_TIPO_LABEL, PRIORIDADE_LABEL } from "@/lib/domain";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -47,6 +47,7 @@ const shiftDay = (d: string, delta: number) => {
 type TarefaRow = {
   id: string;
   tipo: string;
+  prioridade: string;
   status: string;
   hora_prevista: string | null;
   responsavel_id: string | null;
@@ -71,6 +72,13 @@ const COLUNAS: { id: ColunaId; label: string; tone: string }[] = [
   { id: "concluida", label: "Concluídas", tone: "border-success/60 bg-success/5" },
 ];
 
+const PRIORIDADE_BORDA: Record<string, string> = {
+  baixa: "border-l-muted-foreground/40",
+  media: "border-l-primary",
+  alta: "border-l-warning",
+  urgente: "border-l-destructive",
+};
+
 function colunaDaTarefa(t: TarefaRow): ColunaId {
   if (t.status === "concluida") return "concluida";
   if (t.status === "pendente" || t.status === "pausada" || t.status === "cancelada") return "pendente";
@@ -91,7 +99,8 @@ function readDiaFromUrl(): string {
 }
 
 function KanbanPage() {
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
+  const podeCriar = hasAnyRole(FRONT_DESK_ROLES);
   const [dia, setDiaState] = useState<string>(readDiaFromUrl());
 
   const [tarefas, setTarefas] = useState<TarefaRow[]>([]);
@@ -111,7 +120,7 @@ function KanbanPage() {
     setLoading(true);
     const { data: ts, error } = await supabase
       .from("tarefas")
-      .select("id,tipo,status,hora_prevista,responsavel_id,vistoriador_id,unidade_id,ordem_dia,montagem_cama,hospedes,noites,senha_apartamento")
+      .select("id,tipo,prioridade,status,hora_prevista,responsavel_id,vistoriador_id,unidade_id,ordem_dia,montagem_cama,hospedes,noites,senha_apartamento")
       .eq("data_prevista", dia)
       .order("ordem_dia", { ascending: true, nullsFirst: false })
       .order("hora_prevista", { ascending: true });
@@ -229,11 +238,21 @@ function KanbanPage() {
           <h1 className="text-2xl font-bold">Kanban do dia</h1>
           <p className="text-muted-foreground text-sm">Arraste tarefas entre colunas ou use o menu</p>
         </div>
-        <Link to="/app">
-          <Button variant="outline" size="sm">
-            Voltar ao painel
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {podeCriar && (
+            <Link to="/app/tarefas/nova">
+              <Button size="sm">
+                <Plus className="size-4" />
+                Nova tarefa
+              </Button>
+            </Link>
+          )}
+          <Link to="/app">
+            <Button variant="outline" size="sm">
+              Voltar ao painel
+            </Button>
+          </Link>
+        </div>
       </header>
 
       <div className="flex items-center gap-2">
@@ -361,7 +380,9 @@ function TarefaCard({
   else resp = t.responsavel_id ? (respMap.get(t.responsavel_id) ?? "Responsável") : "Sem responsável";
 
   return (
-    <Card className={`bg-background ${dragging ? "shadow-2xl" : "shadow-sm"} touch-none`}>
+    <Card
+      className={`bg-background border-l-4 ${PRIORIDADE_BORDA[t.prioridade] ?? "border-l-muted-foreground/40"} ${dragging ? "shadow-2xl" : "shadow-sm"} touch-none`}
+    >
       <CardContent className="p-2.5 space-y-1.5">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
@@ -369,6 +390,7 @@ function TarefaCard({
             <div className="text-[11px] text-muted-foreground truncate">
               {TAREFA_TIPO_LABEL[t.tipo] ?? t.tipo}
               {t.hora_prevista && ` · ${t.hora_prevista.slice(0, 5)}`}
+              {t.prioridade !== "media" && ` · ${PRIORIDADE_LABEL[t.prioridade] ?? t.prioridade}`}
             </div>
           </div>
           {onMover && (
