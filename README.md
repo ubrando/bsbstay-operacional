@@ -29,6 +29,30 @@ Na primeira execução, o plugin do TanStack Router gera `src/routeTree.gen.ts`
 automaticamente a partir dos arquivos em `src/routes/` — não é necessário (nem
 recomendado) editar esse arquivo manualmente.
 
+## Ambientes: dev vs. produção
+
+**Nunca desenvolva/teste contra o Supabase de produção do cliente.** Use dois
+projetos Supabase separados:
+
+| | Projeto Supabase | Quem é dono | Onde fica configurado |
+|---|---|---|---|
+| **Dev/local** | Um projeto seu, gratuito, só para testar | Você | `.env` local (nunca commitado) |
+| **Produção** | O projeto do cliente (conta dele) | Cliente | Variáveis de ambiente no Cloudflare (secrets do Worker) |
+
+Fluxo recomendado:
+1. Crie um projeto Supabase novo (free tier) só para desenvolvimento.
+2. `npx supabase link --project-ref <ref-do-dev>` e `npx supabase db push`
+   aplicam as migrations nesse projeto de teste.
+3. Seu `.env` local aponta só para esse projeto de dev.
+4. Quando algo estiver pronto para ir ao ar, as mesmas migrations são
+   aplicadas no projeto de produção (do cliente), e o deploy no Cloudflare
+   usa as credenciais de produção via `wrangler secret put` — nunca via
+   `.env` commitado.
+
+Isso também reforça o que já vendemos na proposta: os dados de produção são
+100% do cliente, na conta Supabase dele — o ambiente de dev é só seu, para
+não misturar dado de teste com dado real da operação.
+
 ## Banco de dados
 
 O schema vive em `supabase/migrations/`. Para aplicar num projeto Supabase:
