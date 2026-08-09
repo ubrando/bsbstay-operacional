@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,12 @@ function LoginPage() {
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Entrando..." : "Entrar"}
         </Button>
+        <p className="text-sm text-center text-muted-foreground">
+          Ainda não tem conta?{" "}
+          <Link to="/cadastro" className="text-foreground underline underline-offset-2">
+            Cadastre-se
+          </Link>
+        </p>
       </form>
     </div>
   );

@@ -159,6 +159,43 @@ Componentes shadcn ficam em `src/components/ui/`; adicionar novos com
 `src/*`). Componentes de app (não shadcn) ficam direto em
 `src/components/` (ex: `AppShell.tsx`).
 
+### Formulários
+
+`react-hook-form` + `@hookform/resolvers` + `zod` são dependências do
+projeto desde o início (não foram usadas até `cadastro.tsx`) — esse é o
+padrão pra formulário novo com validação de campo, em vez de cada tela
+inventar seu próprio esquema de `useState` + checagem manual no submit.
+
+```tsx
+const schema = z.object({ email: z.string().email("E-mail inválido") /* ... */ });
+type FormData = z.infer<typeof schema>;
+
+const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
+  resolver: zodResolver(schema),
+  mode: "onTouched",
+  defaultValues: { email: "" /* ... */ },
+});
+```
+
+Erro de campo renderiza logo abaixo do próprio `<Input {...register("x")} />`
+via `errors.x?.message` — nunca um alert genérico no topo do formulário.
+`handleSubmit(async (data) => {...})` só chama a função passada depois que o
+zod validar tudo; erro de API (ex: e-mail já cadastrado) continua sendo
+tratado à parte com `toast.error`, já que zod não sabe disso sem round-trip.
+Para feedback ao vivo (ex: checklist de força de senha) que precisa
+recalcular a cada tecla independente do modo de validação do formulário,
+derive direto de `watch("campo")` em vez de depender de `errors`.
+
+Se o schema zod (ou qualquer import só do formulário) for declarado fora do
+componente num arquivo de rota de um único arquivo, ele vaza pro bundle
+compartilhado — ver a seção de Performance abaixo, "segundo precedente".
+Rota nova com formulário zod nasce como par `.tsx` + `.lazy.tsx`.
+
+As telas mais antigas (`app.tarefas.nova.tsx`, `app.unidades.nova.tsx`,
+etc.) ainda usam `useState` por campo — não precisam ser migradas por causa
+disso sozinho, mas um formulário **novo** com regras de validação não
+triviais deve nascer usando esse padrão.
+
 ## Performance / tamanho de bundle
 
 As camareiras usam o sistema pelo celular, muitas vezes com sinal fraco na
@@ -191,3 +228,26 @@ incondicionalmente no construtor, então qualquer código que importe o
 client estaticamente carrega essas duas dependências mesmo sem usar
 Storage/Functions — isso não dá pra tree-shakear, só evitar adiando o
 `import()` do client para o momento em que ele é realmente necessário.
+
+Segundo precedente, mais sutil: o code-splitting automático do
+`@tanstack/router-plugin` (um arquivo de rota só, com `component:` apontando
+pra uma função no mesmo arquivo) separa em chunk lazy só o que está **dentro**
+da função do componente. Qualquer `const`/`import` no nível do módulo do
+arquivo de rota (um schema zod definido fora do componente, por exemplo) fica
+no "módulo principal" da rota — que é carregado eager, no bundle
+compartilhado, mesmo que só o componente lazy use esse schema. Foi assim que
+`zod` (usado só em `cadastro.tsx`) vazou pro chunk que `/login` também
+carrega: ~55kB a mais no bundle bloqueante de toda rota, só por causa de um
+`z.object({...})` declarado fora da função do componente. A correção não foi
+mover o schema pra dentro do componente (recriaria o objeto zod a cada
+render) — foi separar em dois arquivos usando a convenção oficial do
+TanStack Router: `cadastro.tsx` só com `createFileRoute("/cadastro")({})`
+(sem `component`), e `cadastro.lazy.tsx` com `createLazyFileRoute("/cadastro")({ component: CadastroPage })`
+carregando o resto (schema, imports pesados, o componente em si). Isso cria
+um limite de **arquivo**, não uma heurística de AST — garantido pelo bundler,
+não por convenção. Regra: qualquer rota que declare algo pesado (zod,
+qualquer lib nova) fora da função do componente deve nascer já como par
+`.tsx` + `.lazy.tsx`; depois de implementar, sempre confirme rodando
+`npm run build` e checando se a dependência nova aparece no chunk
+compartilhado (grep por um símbolo característico dela nos chunks
+`index-*.js`), não só se o chunk da própria rota existe.
