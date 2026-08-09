@@ -298,6 +298,7 @@ export type Database = {
     Functions: {
       has_role: { Args: { _user_id: string; _role: Database["public"]["Enums"]["app_role"] }; Returns: boolean }
       has_any_role: { Args: { _user_id: string; _roles: Database["public"]["Enums"]["app_role"][] }; Returns: boolean }
+      list_user_emails: { Args: Record<string, never>; Returns: { user_id: string; email: string }[] }
     }
     Enums: {
       app_role: "camareira" | "vistoriador" | "atendimento" | "operacional" | "manager" | "super_admin" | "pending_user"

@@ -16,6 +16,7 @@ interface AuthCtx {
   isOperator: boolean;
   isFrontDesk: boolean;
   isPending: boolean;
+  isInactive: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -30,27 +31,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [ativo, setAtivo] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) setTimeout(() => loadRoles(s.user.id), 0);
-      else setRoles([]);
+      if (s?.user) setTimeout(() => loadPerfil(s.user.id), 0);
+      else {
+        setRoles([]);
+        setAtivo(true);
+      }
     });
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) loadRoles(s.user.id).finally(() => setLoading(false));
+      if (s?.user) loadPerfil(s.user.id).finally(() => setLoading(false));
       else setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function loadRoles(uid: string) {
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", uid);
-    setRoles((data ?? []).map((r) => r.role));
+  /** Carrega roles e o campo `ativo` do profile — ambos decidem se o acesso é liberado. */
+  async function loadPerfil(uid: string) {
+    const [{ data: roleRows }, { data: profile }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", uid),
+      supabase.from("profiles").select("ativo").eq("user_id", uid).maybeSingle(),
+    ]);
+    setRoles((roleRows ?? []).map((r) => r.role));
+    setAtivo(profile?.ativo ?? true);
   }
 
   const hasRole = (r: AppRole) => roles.includes(r);
@@ -59,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isOperator = OPERATOR_ROLES.some((r) => roles.includes(r));
   const isFrontDesk = FRONT_DESK_ROLES.some((r) => roles.includes(r));
   const isPending = roles.length === 0 || (roles.length === 1 && roles[0] === "pending_user");
+  const isInactive = !ativo;
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -66,7 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, session, roles, loading, hasRole, hasAnyRole, isSuperAdmin, isOperator, isFrontDesk, isPending, signOut }}>
+    <Ctx.Provider
+      value={{ user, session, roles, loading, hasRole, hasAnyRole, isSuperAdmin, isOperator, isFrontDesk, isPending, isInactive, signOut }}
+    >
       {children}
     </Ctx.Provider>
   );

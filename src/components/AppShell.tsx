@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { useAuth, ROLE_LABELS } from "@/lib/auth";
+import { useAuth, ROLE_LABELS, OPERATOR_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, KanbanSquare, Building2, LogOut } from "lucide-react";
+import { LayoutDashboard, KanbanSquare, Building2, Users, LogOut } from "lucide-react";
 
 const NAV = [
   { to: "/app", label: "Painel", icon: LayoutDashboard },
@@ -10,14 +10,15 @@ const NAV = [
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, roles, signOut } = useAuth();
+  const { user, roles, hasAnyRole, signOut } = useAuth();
+  const nav = hasAnyRole(OPERATOR_ROLES) ? [...NAV, { to: "/app/usuarios", label: "Usuários", icon: Users }] : NAV;
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b flex items-center justify-between px-4 h-14 shrink-0">
         <div className="font-semibold text-sm">BSB Stay & Help Estadias</div>
         <nav className="flex items-center gap-1">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.to}
               to={item.to}

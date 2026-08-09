@@ -8,7 +8,7 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
-  const { user, loading, isPending } = useAuth();
+  const { user, loading, isPending, isInactive } = useAuth();
   const nav = useNavigate();
 
   useEffect(() => {
@@ -17,6 +17,17 @@ function AppLayout() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
   if (!user) return null;
+
+  if (isInactive) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-sm text-center space-y-2">
+          <h1 className="font-semibold text-lg">Conta desativada</h1>
+          <p className="text-sm text-muted-foreground">Sua conta foi desativada. Fale com um administrador.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isPending) {
     return (
