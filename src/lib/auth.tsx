@@ -26,6 +26,8 @@ export const OPERATOR_ROLES: AppRole[] = ["operacional", "super_admin"];
 export const FRONT_DESK_ROLES: AppRole[] = [...OPERATOR_ROLES, "atendimento"];
 /** Quem administra a operação do dia — vê a tela de Alertas. */
 export const ALERTAS_ROLES: AppRole[] = [...FRONT_DESK_ROLES, "manager"];
+/** Enxerga indicadores da operação (sem atendimento — não é quem analisa métricas). */
+export const METRICAS_ROLES: AppRole[] = [...OPERATOR_ROLES, "manager"];
 
 const SOMENTE_EXECUCAO_ROLES: AppRole[] = ["camareira", "vistoriador"];
 

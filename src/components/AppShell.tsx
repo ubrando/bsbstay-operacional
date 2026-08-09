@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { useAuth, ROLE_LABELS, OPERATOR_ROLES, ALERTAS_ROLES } from "@/lib/auth";
+import { useAuth, ROLE_LABELS, OPERATOR_ROLES, ALERTAS_ROLES, METRICAS_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ClipboardList, KanbanSquare, Building2, Users, LogOut, Bell } from "lucide-react";
+import { LayoutDashboard, ClipboardList, KanbanSquare, Building2, Users, LogOut, Bell, BarChart3 } from "lucide-react";
 import { useAlertas } from "@/lib/use-alertas";
 
 const NAV = [
@@ -18,6 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   let nav = NAV;
   if (hasAnyRole(OPERATOR_ROLES)) nav = [...nav, { to: "/app/usuarios", label: "Usuários", icon: Users }];
+  if (hasAnyRole(METRICAS_ROLES)) nav = [...nav, { to: "/app/metricas", label: "Métricas", icon: BarChart3 }];
   if (podeVerAlertas) nav = [...nav, { to: "/app/alertas", label: "Alertas", icon: Bell }];
 
   const alertaUrgente = atrasadas.length > 0 || proximas.length > 0;
