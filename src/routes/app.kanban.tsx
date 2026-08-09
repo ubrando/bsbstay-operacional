@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -15,7 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, KeyRound, Bed, Users as UsersIcon, Moon, Hash, Plus } from "lucide-react";
-import { TAREFA_TIPO_LABEL, PRIORIDADE_LABEL } from "@/lib/domain";
+import { TAREFA_TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_BORDA, TAREFA_STATUS_LABEL } from "@/lib/domain";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -30,19 +31,15 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
+import { useDiaNavegacao, todayStr, shiftDay } from "@/lib/use-dia-navegacao";
+import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
+import { useResponsaveisDisponiveis } from "@/lib/use-responsaveis-disponiveis";
 
 import type { Database } from "@/lib/supabase/types";
 
 export const Route = createFileRoute("/app/kanban")({
   component: KanbanPage,
 });
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const shiftDay = (d: string, delta: number) => {
-  const dt = new Date(d + "T00:00:00");
-  dt.setDate(dt.getDate() + delta);
-  return dt.toISOString().slice(0, 10);
-};
 
 type TarefaRow = {
   id: string;
@@ -72,13 +69,6 @@ const COLUNAS: { id: ColunaId; label: string; tone: string }[] = [
   { id: "concluida", label: "Concluídas", tone: "border-success/60 bg-success/5" },
 ];
 
-const PRIORIDADE_BORDA: Record<string, string> = {
-  baixa: "border-l-muted-foreground/40",
-  media: "border-l-primary",
-  alta: "border-l-warning",
-  urgente: "border-l-destructive",
-};
-
 function colunaDaTarefa(t: TarefaRow): ColunaId {
   if (t.status === "concluida") return "concluida";
   if (t.status === "pendente" || t.status === "pausada" || t.status === "cancelada") return "pendente";
@@ -92,28 +82,42 @@ function statusDaColuna(col: ColunaId): string {
   return "em_andamento";
 }
 
-function readDiaFromUrl(): string {
-  if (typeof window === "undefined") return todayStr();
-  const p = new URLSearchParams(window.location.search);
-  return p.get("dia") || todayStr();
+function tarefaTemPessoa(t: TarefaRow, userId: string): boolean {
+  return t.responsavel_id === userId || t.vistoriador_id === userId || (t.camareiras_ids ?? []).includes(userId);
 }
+
+const TODOS = "todos";
 
 function KanbanPage() {
   const { user, hasAnyRole } = useAuth();
   const podeCriar = hasAnyRole(FRONT_DESK_ROLES);
-  const [dia, setDiaState] = useState<string>(readDiaFromUrl());
+  const { dia, setDia, isHoje } = useDiaNavegacao();
+  const { mudarStatus: mudarStatusBase } = useMudarStatusTarefa();
 
   const [tarefas, setTarefas] = useState<TarefaRow[]>([]);
   const [unidades, setUnidades] = useState<Map<string, UnidadeRow>>(new Map());
   const [respMap, setRespMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState(TODOS);
+  const [filtroPrioridade, setFiltroPrioridade] = useState(TODOS);
+  const [filtroStatus, setFiltroStatus] = useState(TODOS);
+  const [filtroResponsavel, setFiltroResponsavel] = useState(TODOS);
   const [dragId, setDragId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
+
+  // Reaproveita a mesma busca de camareiras/vistoriadores usada na criação
+  // de tarefas — "limpeza_checkout" traz as duas listas (ver hook).
+  const { camareiras, vistoriadores } = useResponsaveisDisponiveis("limpeza_checkout", true);
+  const responsaveisOpcoes = useMemo(() => {
+    const map = new Map<string, string>();
+    [...camareiras, ...vistoriadores].forEach((r) => map.set(r.user_id, r.nome_completo));
+    return [...map.entries()].map(([user_id, nome_completo]) => ({ user_id, nome_completo })).sort((a, b) => a.nome_completo.localeCompare(b.nome_completo));
+  }, [camareiras, vistoriadores]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -171,13 +175,20 @@ function KanbanPage() {
   useRealtimeRefresh(["tarefas", "tarefa_camareiras", "unidades", "liberacoes"], load);
 
   const tarefasFiltradas = useMemo(() => {
-    if (!filtro.trim()) return tarefas;
-    const q = filtro.toLowerCase();
+    const q = filtro.trim().toLowerCase();
     return tarefas.filter((t) => {
-      const u = unidades.get(t.unidade_id);
-      return u && (u.nome.toLowerCase().includes(q) || u.codigo.toLowerCase().includes(q));
+      if (q) {
+        const u = unidades.get(t.unidade_id);
+        if (!u || !(u.nome.toLowerCase().includes(q) || u.codigo.toLowerCase().includes(q))) return false;
+      }
+      if (filtroTipo !== TODOS && t.tipo !== filtroTipo) return false;
+      if (filtroPrioridade !== TODOS && t.prioridade !== filtroPrioridade) return false;
+      if (filtroResponsavel !== TODOS && !tarefaTemPessoa(t, filtroResponsavel)) return false;
+      // Status não filtra aqui de propósito — já é representado pelas colunas;
+      // ver TarefaCard, que esmaece o card em vez de escondê-lo.
+      return true;
     });
-  }, [tarefas, filtro, unidades]);
+  }, [tarefas, filtro, unidades, filtroTipo, filtroPrioridade, filtroResponsavel]);
 
   const porColuna = useMemo(() => {
     const map = new Map<ColunaId, TarefaRow[]>();
@@ -185,15 +196,6 @@ function KanbanPage() {
     for (const t of tarefasFiltradas) map.get(colunaDaTarefa(t))!.push(t);
     return map;
   }, [tarefasFiltradas]);
-
-  const setDia = (d: string) => {
-    setDiaState(d);
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      p.set("dia", d);
-      window.history.replaceState({}, "", `${window.location.pathname}?${p.toString()}`);
-    }
-  };
 
   async function moverTarefa(id: string, novaColuna: ColunaId) {
     const t = tarefas.find((x) => x.id === id);
@@ -205,15 +207,10 @@ function KanbanPage() {
 
     // Otimista
     setTarefas((prev) => prev.map((x) => (x.id === id ? { ...x, status: novoStatus } : x)));
-    const patch: Database["public"]["Tables"]["tarefas"]["Update"] = {
-      status: novoStatus as Database["public"]["Enums"]["tarefa_status"],
-    };
-    if (novoStatus === "em_andamento" && !t.status.includes("andamento")) patch.iniciado_em = new Date().toISOString();
-    if (novoStatus === "concluida") patch.finalizado_em = new Date().toISOString();
-    const { error } = await supabase.from("tarefas").update(patch).eq("id", id);
+    const { error } = await mudarStatusBase(id, t.status, novoStatus as Database["public"]["Enums"]["tarefa_status"]);
     if (error) {
       setTarefas((prev) => prev.map((x) => (x.id === id ? { ...x, status: t.status } : x)));
-      toast.error("Não foi possível mover: " + error.message);
+      toast.error("Não foi possível mover: " + error);
     } else {
       toast.success("Tarefa movida");
     }
@@ -228,7 +225,6 @@ function KanbanPage() {
     moverTarefa(id, overId as ColunaId);
   }
 
-  const isHoje = dia === todayStr();
   const tarefaAtiva = dragId ? tarefas.find((t) => t.id === dragId) : null;
 
   return (
@@ -273,7 +269,61 @@ function KanbanPage() {
         )}
       </div>
 
-      <Input placeholder="Filtrar por unidade..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="h-10" />
+      <div className="flex flex-wrap gap-2">
+        <Input placeholder="Filtrar por unidade..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="h-10 flex-1 min-w-[180px]" />
+        <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+          <SelectTrigger className="h-10 w-auto min-w-[140px]">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os tipos</SelectItem>
+            {Object.entries(TAREFA_TIPO_LABEL).map(([v, label]) => (
+              <SelectItem key={v} value={v}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
+          <SelectTrigger className="h-10 w-auto min-w-[140px]">
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todas as prioridades</SelectItem>
+            {Object.entries(PRIORIDADE_LABEL).map(([v, label]) => (
+              <SelectItem key={v} value={v}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+          <SelectTrigger className="h-10 w-auto min-w-[140px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os status</SelectItem>
+            {Object.entries(TAREFA_STATUS_LABEL).map(([v, label]) => (
+              <SelectItem key={v} value={v}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
+          <SelectTrigger className="h-10 w-auto min-w-[160px]">
+            <SelectValue placeholder="Responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os responsáveis</SelectItem>
+            {responsaveisOpcoes.map((r) => (
+              <SelectItem key={r.user_id} value={r.user_id}>
+                {r.nome_completo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {loading ? (
         <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
@@ -290,13 +340,22 @@ function KanbanPage() {
         >
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             {COLUNAS.map((col) => (
-              <Coluna key={col.id} col={col} tarefas={porColuna.get(col.id) ?? []} unidades={unidades} respMap={respMap} onMover={moverTarefa} />
+              <Coluna
+                key={col.id}
+                col={col}
+                tarefas={porColuna.get(col.id) ?? []}
+                unidades={unidades}
+                respMap={respMap}
+                onMover={moverTarefa}
+                filtroStatus={filtroStatus}
+                dia={dia}
+              />
             ))}
           </div>
           <DragOverlay>
             {tarefaAtiva ? (
               <div className="opacity-90 rotate-2">
-                <TarefaCard t={tarefaAtiva} unidade={unidades.get(tarefaAtiva.unidade_id)} respMap={respMap} dragging />
+                <TarefaCard t={tarefaAtiva} unidade={unidades.get(tarefaAtiva.unidade_id)} respMap={respMap} filtroStatus={filtroStatus} dia={dia} dragging />
               </div>
             ) : null}
           </DragOverlay>
@@ -312,12 +371,16 @@ function Coluna({
   unidades,
   respMap,
   onMover,
+  filtroStatus,
+  dia,
 }: {
   col: { id: ColunaId; label: string; tone: string };
   tarefas: TarefaRow[];
   unidades: Map<string, UnidadeRow>;
   respMap: Map<string, string>;
   onMover: (id: string, c: ColunaId) => void;
+  filtroStatus: string;
+  dia: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   return (
@@ -332,7 +395,9 @@ function Coluna({
         {tarefas.length === 0 ? (
           <div className="text-xs text-muted-foreground text-center py-6">—</div>
         ) : (
-          tarefas.map((t) => <DraggableCard key={t.id} t={t} unidade={unidades.get(t.unidade_id)} respMap={respMap} onMover={onMover} />)
+          tarefas.map((t) => (
+            <DraggableCard key={t.id} t={t} unidade={unidades.get(t.unidade_id)} respMap={respMap} onMover={onMover} filtroStatus={filtroStatus} dia={dia} />
+          ))
         )}
       </div>
     </div>
@@ -344,16 +409,20 @@ function DraggableCard({
   unidade,
   respMap,
   onMover,
+  filtroStatus,
+  dia,
 }: {
   t: TarefaRow;
   unidade?: UnidadeRow;
   respMap: Map<string, string>;
   onMover: (id: string, c: ColunaId) => void;
+  filtroStatus: string;
+  dia: string;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: t.id });
   return (
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners}>
-      <TarefaCard t={t} unidade={unidade} respMap={respMap} onMover={onMover} />
+      <TarefaCard t={t} unidade={unidade} respMap={respMap} onMover={onMover} filtroStatus={filtroStatus} dia={dia} />
     </div>
   );
 }
@@ -363,12 +432,16 @@ function TarefaCard({
   unidade,
   respMap,
   onMover,
+  filtroStatus,
+  dia,
   dragging,
 }: {
   t: TarefaRow;
   unidade?: UnidadeRow;
   respMap: Map<string, string>;
   onMover?: (id: string, c: ColunaId) => void;
+  filtroStatus: string;
+  dia: string;
   dragging?: boolean;
 }) {
   const ehLimpeza = t.tipo === "limpeza_checkout" || t.tipo === "limpeza_intermediaria";
@@ -379,9 +452,11 @@ function TarefaCard({
   else if (t.tipo === "vistoria") resp = vistNome ?? "Sem vistoriador";
   else resp = t.responsavel_id ? (respMap.get(t.responsavel_id) ?? "Responsável") : "Sem responsável";
 
+  const destacada = filtroStatus === TODOS || t.status === filtroStatus;
+
   return (
     <Card
-      className={`bg-background border-l-4 ${PRIORIDADE_BORDA[t.prioridade] ?? "border-l-muted-foreground/40"} ${dragging ? "shadow-2xl" : "shadow-sm"} touch-none`}
+      className={`bg-background border-l-4 ${PRIORIDADE_BORDA[t.prioridade] ?? "border-l-muted-foreground/40"} ${dragging ? "shadow-2xl" : "shadow-sm"} touch-none ${destacada ? "" : "opacity-40"}`}
     >
       <CardContent className="p-2.5 space-y-1.5">
         <div className="flex items-start justify-between gap-1">
@@ -414,7 +489,7 @@ function TarefaCard({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <Link to="/app/tarefas/$id" params={{ id: t.id }}>
+                <Link to="/app/tarefas/$id" params={{ id: t.id }} search={{ from: "kanban", dia }}>
                   <DropdownMenuItem>Abrir tarefa</DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>

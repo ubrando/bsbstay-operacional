@@ -72,6 +72,13 @@ export const SOLICITACAO_TIPO_LABEL: Record<string, string> = {
   outro: "Outro",
 };
 
+export const PRIORIDADE_BORDA: Record<string, string> = {
+  baixa: "border-l-muted-foreground/40",
+  media: "border-l-primary",
+  alta: "border-l-warning",
+  urgente: "border-l-destructive",
+};
+
 export function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (["concluida", "liberado"].includes(status)) return "default";
   if (["em_andamento", "em_limpeza", "em_vistoria"].includes(status)) return "secondary";

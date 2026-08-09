@@ -1,16 +1,25 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Upload } from "lucide-react";
-import { useAuth, FRONT_DESK_ROLES } from "@/lib/auth";
+import { useAuth, FRONT_DESK_ROLES, isSomenteExecucao } from "@/lib/auth";
 
 export const Route = createFileRoute("/app/")({
   component: Painel,
 });
 
 function Painel() {
-  const { hasAnyRole } = useAuth();
+  const { roles, hasAnyRole } = useAuth();
+  const nav = useNavigate();
   const podeCriar = hasAnyRole(FRONT_DESK_ROLES);
+  const somenteExecucao = isSomenteExecucao(roles);
+
+  useEffect(() => {
+    if (somenteExecucao) nav({ to: "/app/minhas-tarefas" });
+  }, [somenteExecucao]);
+
+  if (somenteExecucao) return null;
 
   return (
     <div className="space-y-4">

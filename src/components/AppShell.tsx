@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth, ROLE_LABELS, OPERATOR_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, KanbanSquare, Building2, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, ClipboardList, KanbanSquare, Building2, Users, LogOut } from "lucide-react";
 
 const NAV = [
   { to: "/app", label: "Painel", icon: LayoutDashboard },
+  { to: "/app/minhas-tarefas", label: "Minhas tarefas", icon: ClipboardList },
   { to: "/app/kanban", label: "Kanban", icon: KanbanSquare },
   { to: "/app/unidades", label: "Unidades", icon: Building2 },
 ];

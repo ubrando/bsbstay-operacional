@@ -11,24 +11,30 @@ import { TAREFA_TIPO_LABEL, TAREFA_STATUS_LABEL, statusBadgeVariant, formatMin }
 import { toast } from "sonner";
 import { AtribuirResponsaveis } from "@/components/AtribuirResponsaveis";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
+import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
 import type { Database } from "@/lib/supabase/types";
 
 export const Route = createFileRoute("/app/tarefas/$id")({
   component: TarefaDetalhe,
+  validateSearch: (search: Record<string, unknown>) => ({
+    from: search.from === "minhas-tarefas" ? ("minhas-tarefas" as const) : search.from === "kanban" ? ("kanban" as const) : undefined,
+    dia: typeof search.dia === "string" ? search.dia : undefined,
+  }),
 });
 
 type Tarefa = Database["public"]["Tables"]["tarefas"]["Row"] & { unidades?: { nome: string; codigo: string } | null };
 
 function TarefaDetalhe() {
   const { id } = Route.useParams();
-  const { user, hasAnyRole } = useAuth();
+  const search = Route.useSearch();
+  const { hasAnyRole } = useAuth();
   const podeEditar = hasAnyRole(FRONT_DESK_ROLES);
 
   const [t, setT] = useState<Tarefa | null>(null);
   const [camareiras, setCamareiras] = useState<{ user_id: string; nome_completo: string }[]>([]);
   const [tempos, setTempos] = useState<Database["public"]["Tables"]["tempo_registros"]["Row"][]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const { mudarStatus: mudarStatusBase, busyId } = useMudarStatusTarefa();
 
   async function load() {
     const { data } = await supabase.from("tarefas").select("*, unidades:unidade_id(nome, codigo)").eq("id", id).maybeSingle();
@@ -55,29 +61,8 @@ function TarefaDetalhe() {
 
   async function mudarStatus(status: Database["public"]["Enums"]["tarefa_status"]) {
     if (!t) return;
-    setBusy(true);
-    const patch: Database["public"]["Tables"]["tarefas"]["Update"] = { status };
-    if (status === "em_andamento" && t.status !== "em_andamento") patch.iniciado_em = new Date().toISOString();
-    if (status === "concluida") patch.finalizado_em = new Date().toISOString();
-    const { error } = await supabase.from("tarefas").update(patch).eq("id", t.id);
-    if (!error && user && (status === "em_andamento" || status === "concluida")) {
-      // Fecha o registro de tempo em aberto, se houver, ou abre um novo
-      if (status === "em_andamento") {
-        await supabase.from("tempo_registros").insert({ tarefa_id: t.id, user_id: user.id });
-      } else {
-        const aberto = tempos.find((tr) => !tr.fim);
-        if (aberto) {
-          const fim = new Date();
-          const inicio = new Date(aberto.inicio);
-          await supabase
-            .from("tempo_registros")
-            .update({ fim: fim.toISOString(), duracao_min: Math.round((fim.getTime() - inicio.getTime()) / 60000) })
-            .eq("id", aberto.id);
-        }
-      }
-    }
-    setBusy(false);
-    if (error) return toast.error(error.message);
+    const { error } = await mudarStatusBase(t.id, t.status, status);
+    if (error) return toast.error(error);
     toast.success("Status atualizado");
     load();
   }
@@ -90,12 +75,21 @@ function TarefaDetalhe() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <Link to="/app/kanban">
-          <Button variant="ghost" size="sm">
-            <ChevronLeft className="size-4 mr-1" />
-            Voltar ao kanban
-          </Button>
-        </Link>
+        {search.from === "minhas-tarefas" ? (
+          <Link to="/app/minhas-tarefas" search={search.dia ? { dia: search.dia } : {}}>
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="size-4 mr-1" />
+              Voltar para Minhas tarefas
+            </Button>
+          </Link>
+        ) : (
+          <Link to="/app/kanban" search={search.dia ? { dia: search.dia } : {}}>
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="size-4 mr-1" />
+              Voltar ao Kanban
+            </Button>
+          </Link>
+        )}
         <Badge variant={statusBadgeVariant(t.status)}>{TAREFA_STATUS_LABEL[t.status]}</Badge>
       </div>
 
@@ -132,17 +126,17 @@ function TarefaDetalhe() {
           {podeEditar && (
             <div className="flex gap-2 flex-wrap">
               {t.status !== "em_andamento" && t.status !== "concluida" && (
-                <Button size="sm" onClick={() => mudarStatus("em_andamento")} disabled={busy}>
+                <Button size="sm" onClick={() => mudarStatus("em_andamento")} disabled={busyId === t.id}>
                   <Play className="size-4 mr-1" /> Iniciar
                 </Button>
               )}
               {t.status === "em_andamento" && (
-                <Button size="sm" variant="outline" onClick={() => mudarStatus("pausada")} disabled={busy}>
+                <Button size="sm" variant="outline" onClick={() => mudarStatus("pausada")} disabled={busyId === t.id}>
                   <Pause className="size-4 mr-1" /> Pausar
                 </Button>
               )}
               {t.status !== "concluida" && (
-                <Button size="sm" variant="default" onClick={() => mudarStatus("concluida")} disabled={busy}>
+                <Button size="sm" variant="default" onClick={() => mudarStatus("concluida")} disabled={busyId === t.id}>
                   <CheckCircle2 className="size-4 mr-1" /> Concluir
                 </Button>
               )}

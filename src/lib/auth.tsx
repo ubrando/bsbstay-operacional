@@ -25,6 +25,14 @@ export const OPERATOR_ROLES: AppRole[] = ["operacional", "super_admin"];
 /** Acesso amplo de edição operacional (inclui atendimento). */
 export const FRONT_DESK_ROLES: AppRole[] = [...OPERATOR_ROLES, "atendimento"];
 
+const SOMENTE_EXECUCAO_ROLES: AppRole[] = ["camareira", "vistoriador"];
+
+/** Só executa tarefas no dia a dia (sem acesso administrativo) — usado pra
+ *  decidir se o Painel deve redirecionar direto pra Minhas tarefas. */
+export function isSomenteExecucao(roles: AppRole[]): boolean {
+  return roles.length > 0 && roles.every((r) => SOMENTE_EXECUCAO_ROLES.includes(r));
+}
+
 const Ctx = createContext<AuthCtx | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
