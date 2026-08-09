@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ShieldAlert, UserRound } from "lucide-react";
+import { Search, ShieldAlert, UserRound, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import type { Database } from "@/lib/supabase/types";
@@ -43,10 +43,15 @@ function isPendente(u: Usuario) {
   return u.roles.length === 0 || (u.roles.length === 1 && u.roles[0] === "pending_user");
 }
 
+const TODOS = "todos";
+
 function UsuariosGestao() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
+  const [filtroRole, setFiltroRole] = useState<string>(TODOS);
+  const [filtroStatus, setFiltroStatus] = useState<string>(TODOS);
+  const [somentePendentes, setSomentePendentes] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -78,14 +83,21 @@ function UsuariosGestao() {
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    const lista = q ? usuarios.filter((u) => u.nome_completo.toLowerCase().includes(q)) : usuarios;
+    const lista = usuarios.filter((u) => {
+      if (q && !u.nome_completo.toLowerCase().includes(q)) return false;
+      if (somentePendentes && !isPendente(u)) return false;
+      if (filtroRole !== TODOS && !u.roles.includes(filtroRole as AppRole)) return false;
+      if (filtroStatus === "ativo" && !u.ativo) return false;
+      if (filtroStatus === "inativo" && u.ativo) return false;
+      return true;
+    });
     return [...lista].sort((a, b) => {
       const pa = isPendente(a) ? 0 : 1;
       const pb = isPendente(b) ? 0 : 1;
       if (pa !== pb) return pa - pb;
       return a.nome_completo.localeCompare(b.nome_completo);
     });
-  }, [usuarios, busca]);
+  }, [usuarios, busca, filtroRole, filtroStatus, somentePendentes]);
 
   const pendentesCount = useMemo(() => usuarios.filter(isPendente).length, [usuarios]);
 
@@ -132,12 +144,48 @@ function UsuariosGestao() {
         <Input placeholder="Buscar por nome..." value={busca} onChange={(e) => setBusca(e.target.value)} className="h-9 pl-8" />
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Select value={filtroRole} onValueChange={setFiltroRole}>
+          <SelectTrigger className="h-9 w-auto min-w-[150px]">
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todas as roles</SelectItem>
+            {ASSIGNABLE_ROLES.map((r) => (
+              <SelectItem key={r} value={r}>
+                {ROLE_LABELS[r]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+          <SelectTrigger className="h-9 w-auto min-w-[130px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os status</SelectItem>
+            <SelectItem value="ativo">Ativo</SelectItem>
+            <SelectItem value="inativo">Inativo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          size="sm"
+          variant={somentePendentes ? "default" : "outline"}
+          className="h-9"
+          onClick={() => setSomentePendentes((v) => !v)}
+        >
+          <Hourglass className="size-4" />
+          Só pendentes
+        </Button>
+      </div>
+
       {loading ? (
         <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
       ) : filtrados.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground text-sm">
-            {usuarios.length === 0 ? "Nenhum usuário cadastrado ainda." : "Nenhum usuário encontrado para a busca."}
+            {usuarios.length === 0 ? "Nenhum usuário cadastrado ainda." : "Nenhum usuário bate com a busca/filtros."}
           </CardContent>
         </Card>
       ) : (
