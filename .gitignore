@@ -7,3 +7,4 @@ dist/
 .wrangler/
 .vite/
 src/routeTree.gen.ts
+graphify-out/
