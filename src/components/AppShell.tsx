@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { useAuth, ROLE_LABELS, OPERATOR_ROLES } from "@/lib/auth";
+import { useAuth, ROLE_LABELS, OPERATOR_ROLES, ALERTAS_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ClipboardList, KanbanSquare, Building2, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, ClipboardList, KanbanSquare, Building2, Users, LogOut, Bell } from "lucide-react";
+import { useAlertas } from "@/lib/use-alertas";
 
 const NAV = [
   { to: "/app", label: "Painel", icon: LayoutDashboard },
@@ -12,7 +13,14 @@ const NAV = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, roles, hasAnyRole, signOut } = useAuth();
-  const nav = hasAnyRole(OPERATOR_ROLES) ? [...NAV, { to: "/app/usuarios", label: "Usuários", icon: Users }] : NAV;
+  const podeVerAlertas = hasAnyRole(ALERTAS_ROLES);
+  const { atrasadas, proximas, total: totalAlertas } = useAlertas(podeVerAlertas);
+
+  let nav = NAV;
+  if (hasAnyRole(OPERATOR_ROLES)) nav = [...nav, { to: "/app/usuarios", label: "Usuários", icon: Users }];
+  if (podeVerAlertas) nav = [...nav, { to: "/app/alertas", label: "Alertas", icon: Bell }];
+
+  const alertaUrgente = atrasadas.length > 0 || proximas.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -27,6 +35,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <item.icon className="size-4" />
               {item.label}
+              {item.to === "/app/alertas" && totalAlertas > 0 && (
+                <span
+                  className={`inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${alertaUrgente ? "bg-destructive" : "bg-warning"}`}
+                >
+                  {totalAlertas}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

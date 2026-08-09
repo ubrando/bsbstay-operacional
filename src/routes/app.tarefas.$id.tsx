@@ -17,7 +17,14 @@ import type { Database } from "@/lib/supabase/types";
 export const Route = createFileRoute("/app/tarefas/$id")({
   component: TarefaDetalhe,
   validateSearch: (search: Record<string, unknown>) => ({
-    from: search.from === "minhas-tarefas" ? ("minhas-tarefas" as const) : search.from === "kanban" ? ("kanban" as const) : undefined,
+    from:
+      search.from === "minhas-tarefas"
+        ? ("minhas-tarefas" as const)
+        : search.from === "alertas"
+          ? ("alertas" as const)
+          : search.from === "kanban"
+            ? ("kanban" as const)
+            : undefined,
     dia: typeof search.dia === "string" ? search.dia : undefined,
   }),
 });
@@ -80,6 +87,13 @@ function TarefaDetalhe() {
             <Button variant="ghost" size="sm">
               <ChevronLeft className="size-4 mr-1" />
               Voltar para Minhas tarefas
+            </Button>
+          </Link>
+        ) : search.from === "alertas" ? (
+          <Link to="/app/alertas">
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="size-4 mr-1" />
+              Voltar para Alertas
             </Button>
           </Link>
         ) : (

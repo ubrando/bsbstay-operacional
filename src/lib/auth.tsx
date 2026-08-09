@@ -24,6 +24,8 @@ interface AuthCtx {
 export const OPERATOR_ROLES: AppRole[] = ["operacional", "super_admin"];
 /** Acesso amplo de edição operacional (inclui atendimento). */
 export const FRONT_DESK_ROLES: AppRole[] = [...OPERATOR_ROLES, "atendimento"];
+/** Quem administra a operação do dia — vê a tela de Alertas. */
+export const ALERTAS_ROLES: AppRole[] = [...FRONT_DESK_ROLES, "manager"];
 
 const SOMENTE_EXECUCAO_ROLES: AppRole[] = ["camareira", "vistoriador"];
 

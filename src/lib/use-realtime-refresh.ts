@@ -15,7 +15,7 @@ export function useRealtimeRefresh(
   const debounceMs = options?.debounceMs ?? 400;
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || tables.length === 0) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const trigger = () => {
       if (timer) clearTimeout(timer);
