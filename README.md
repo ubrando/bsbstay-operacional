@@ -14,7 +14,7 @@ JSON solto), corrigimos aqui desde a primeira migration.
 
 - **Frontend**: React 19 + TanStack Start/Router (SSR) + Tailwind v4 + shadcn/ui
 - **Backend**: Supabase (Postgres + Auth + Row Level Security + Realtime)
-- **Deploy**: Cloudflare Workers (via `@cloudflare/vite-plugin` + `wrangler`)
+- **Deploy**: Cloudflare Workers (via `wrangler`, sem `@cloudflare/vite-plugin` — ver DECISIONS.md)
 - **Pacotes**: npm (troque para bun se preferir — o projeto não depende disso)
 
 ## Setup local
