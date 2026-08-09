@@ -98,10 +98,13 @@ do Operacional).
 - Rotas são arquivos em `src/routes/` (convenção file-based do TanStack
   Router: `app.kanban.tsx`, `app.tarefas.$id.tsx`, etc. — `.` no nome vira
   segmento de path aninhado).
-- `src/routes/__root.tsx` monta `QueryClientProvider` (TanStack Query) e
-  `AuthProvider` (`src/lib/auth.tsx`) ao redor de toda a app.
-- `src/routes/app.tsx` é o layout autenticado: redireciona para `/login` se
-  não houver sessão, mostra tela de "cadastro em análise" se o usuário for
+- `src/routes/__root.tsx` monta só `QueryClientProvider` (TanStack Query) ao
+  redor de toda a app — não monta `AuthProvider`, de propósito (ver seção de
+  Performance abaixo: `/login` não deve precisar do client do Supabase no
+  carregamento inicial).
+- `src/routes/app.tsx` é o layout autenticado: monta `AuthProvider`
+  (`src/lib/auth.tsx`) só para a árvore `/app/*`, redireciona para `/login`
+  se não houver sessão, mostra tela de "cadastro em análise" se o usuário for
   `pending_user`, senão renderiza `AppShell` (`src/components/AppShell.tsx`)
   com o `Outlet`.
 - `src/lib/supabase/client.ts` exporta um client lazy (via `Proxy`) que só
@@ -155,3 +158,36 @@ Componentes shadcn ficam em `src/components/ui/`; adicionar novos com
 `npx shadcn add <nome>` (config em `components.json`, alias `@/*` →
 `src/*`). Componentes de app (não shadcn) ficam direto em
 `src/components/` (ex: `AppShell.tsx`).
+
+## Performance / tamanho de bundle
+
+As camareiras usam o sistema pelo celular, muitas vezes com sinal fraco na
+propriedade. O carregamento inicial (especialmente `/login` e o Kanban)
+precisa ficar leve. Regras permanentes:
+
+- Sempre que uma dependência nova e pesada for adicionada (bibliotecas de
+  gráfico, exportação de PDF/Excel, editor de texto rico, etc.), confirme
+  que ela só é carregada na tela que realmente precisa dela (import
+  dinâmico), não no bundle compartilhado.
+- Depois de adicionar uma rota ou dependência nova, rode `npm run build` e
+  confira o tamanho dos chunks no output. Se algum chunk passar de
+  ~300-400kB, isso é um sinal de atenção — investigue antes de considerar a
+  tarefa concluída, não só ignore o aviso do Vite.
+- Ao implementar qualquer tela nova, pense: "isso precisa carregar no
+  primeiro acesso (login/painel), ou só quando o usuário navegar pra cá?"
+  Se for a segunda opção, garanta que está numa rota separada (o TanStack
+  Router já faz isso automaticamente por arquivo de rota, mas confirme).
+
+Precedente: `/login` já teve esse problema — `AuthProvider` estava montado
+em `__root.tsx` (rodando em toda rota, inclusive login) e isso arrastava o
+SDK inteiro do Supabase (auth-js + postgrest-js + storage-js + realtime-js
++ functions-js) para o bundle bloqueante da primeira tela. A correção não
+foi `manualChunks` — foi mover `AuthProvider` para dentro de `app.tsx` (só
+onde `useAuth()` é de fato consumido) e trocar o `import` estático do
+client do Supabase em `login.tsx` por `import()` dinâmico dentro do handler
+de submit. `@supabase/supabase-js` também merece atenção à parte: seu
+`createClient()` instancia `StorageClient` e `RealtimeClient`
+incondicionalmente no construtor, então qualquer código que importe o
+client estaticamente carrega essas duas dependências mesmo sem usar
+Storage/Functions — isso não dá pra tree-shakear, só evitar adiando o
+`import()` do client para o momento em que ele é realmente necessário.

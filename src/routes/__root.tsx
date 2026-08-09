@@ -1,6 +1,5 @@
 import { createRootRoute, Outlet, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "sonner";
 import appCss from "@/styles.css?url";
 
@@ -26,10 +25,8 @@ function RootComponent() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Outlet />
-            <Toaster richColors position="top-right" />
-          </AuthProvider>
+          <Outlet />
+          <Toaster richColors position="top-right" />
         </QueryClientProvider>
         <Scripts />
       </body>

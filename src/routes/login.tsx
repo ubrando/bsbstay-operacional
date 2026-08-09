@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +18,7 @@ function LoginPage() {
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    const { supabase } = await import("@/lib/supabase/client");
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
     setLoading(false);
     if (error) return toast.error(error.message);
