@@ -1,17 +1,28 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAuth, FRONT_DESK_ROLES } from "@/lib/auth";
+import { useAuth, FRONT_DESK_ROLES, OPERATOR_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ChevronLeft, Play, Pause, CheckCircle2, Clock, KeyRound, Plus, Square, CheckSquare, ClipboardCheck, Pencil, Trash2, Check, X } from "lucide-react";
 import { TAREFA_TIPO_LABEL, TAREFA_STATUS_LABEL, statusBadgeVariant, formatMin } from "@/lib/domain";
 import { toast } from "sonner";
 import { AtribuirResponsaveis } from "@/components/AtribuirResponsaveis";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
+import { useExcluirTarefa } from "@/lib/use-excluir-tarefa";
 import type { Database } from "@/lib/supabase/types";
 
 export const Route = createFileRoute("/app/tarefas/$id")({
@@ -34,14 +45,18 @@ type Tarefa = Database["public"]["Tables"]["tarefas"]["Row"] & { unidades?: { no
 function TarefaDetalhe() {
   const { id } = Route.useParams();
   const search = Route.useSearch();
+  const nav = useNavigate();
   const { hasAnyRole } = useAuth();
   const podeEditar = hasAnyRole(FRONT_DESK_ROLES);
+  const podeExcluir = hasAnyRole(OPERATOR_ROLES);
 
   const [t, setT] = useState<Tarefa | null>(null);
   const [camareiras, setCamareiras] = useState<{ user_id: string; nome_completo: string }[]>([]);
   const [tempos, setTempos] = useState<Database["public"]["Tables"]["tempo_registros"]["Row"][]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const { mudarStatus: mudarStatusBase, busyId } = useMudarStatusTarefa();
+  const { excluirTarefa, excluindo } = useExcluirTarefa();
 
   async function load() {
     const { data } = await supabase.from("tarefas").select("*, unidades:unidade_id(nome, codigo)").eq("id", id).maybeSingle();
@@ -72,6 +87,21 @@ function TarefaDetalhe() {
     if (error) return toast.error(error);
     toast.success("Status atualizado");
     load();
+  }
+
+  function voltarParaOrigem() {
+    if (search.from === "minhas-tarefas") return nav({ to: "/app/minhas-tarefas", search: search.dia ? { dia: search.dia } : {} });
+    if (search.from === "alertas") return nav({ to: "/app/alertas" });
+    return nav({ to: "/app/kanban", search: search.dia ? { dia: search.dia } : {} });
+  }
+
+  async function confirmarExclusao() {
+    if (!t) return;
+    const { error } = await excluirTarefa(t.id);
+    setConfirmandoExclusao(false);
+    if (error) return toast.error("Não foi possível excluir: " + error);
+    toast.success("Tarefa excluída");
+    voltarParaOrigem();
   }
 
   if (loading) return <div className="text-center py-8 text-muted-foreground text-sm">Carregando...</div>;
@@ -154,6 +184,11 @@ function TarefaDetalhe() {
                   <CheckCircle2 className="size-4 mr-1" /> Concluir
                 </Button>
               )}
+              {podeExcluir && (
+                <Button size="sm" variant="destructive" className="ml-auto" onClick={() => setConfirmandoExclusao(true)}>
+                  <Trash2 className="size-4 mr-1" /> Excluir tarefa
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -176,6 +211,24 @@ function TarefaDetalhe() {
       </Card>
 
       <DemandasVistoria tarefaId={t.id} tarefaStatus={t.status} vistoriadorId={t.vistoriador_id} />
+
+      <AlertDialog open={confirmandoExclusao} onOpenChange={setConfirmandoExclusao}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. O tempo registrado, as camareiras vinculadas e as demandas de vistoria dessa tarefa também são
+              apagados junto. Solicitações do hóspede vinculadas a ela não são apagadas, só perdem o vínculo com a tarefa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmarExclusao} disabled={excluindo}>
+              {excluindo ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

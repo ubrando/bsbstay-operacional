@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAuth, FRONT_DESK_ROLES } from "@/lib/auth";
+import { useAuth, FRONT_DESK_ROLES, OPERATOR_ROLES } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, KeyRound, Bed, Users as UsersIcon, Moon, Hash, Plus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, KeyRound, Bed, Users as UsersIcon, Moon, Hash, Plus, Trash2 } from "lucide-react";
 import { TAREFA_TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_BORDA, TAREFA_STATUS_LABEL } from "@/lib/domain";
 import { toast } from "sonner";
 import {
@@ -34,6 +44,7 @@ import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { useDiaNavegacao, todayStr, shiftDay } from "@/lib/use-dia-navegacao";
 import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
 import { useResponsaveisDisponiveis } from "@/lib/use-responsaveis-disponiveis";
+import { useExcluirTarefa } from "@/lib/use-excluir-tarefa";
 
 import type { Database } from "@/lib/supabase/types";
 
@@ -91,8 +102,10 @@ const TODOS = "todos";
 function KanbanPage() {
   const { user, hasAnyRole } = useAuth();
   const podeCriar = hasAnyRole(FRONT_DESK_ROLES);
+  const podeExcluir = hasAnyRole(OPERATOR_ROLES);
   const { dia, setDia, isHoje } = useDiaNavegacao();
   const { mudarStatus: mudarStatusBase } = useMudarStatusTarefa();
+  const { excluirTarefa, excluindo } = useExcluirTarefa();
 
   const [tarefas, setTarefas] = useState<TarefaRow[]>([]);
   const [unidades, setUnidades] = useState<Map<string, UnidadeRow>>(new Map());
@@ -104,6 +117,7 @@ function KanbanPage() {
   const [filtroStatus, setFiltroStatus] = useState(TODOS);
   const [filtroResponsavel, setFiltroResponsavel] = useState(TODOS);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [confirmandoExclusaoId, setConfirmandoExclusaoId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -214,6 +228,17 @@ function KanbanPage() {
     } else {
       toast.success("Tarefa movida");
     }
+  }
+
+  async function confirmarExclusao() {
+    if (!confirmandoExclusaoId) return;
+    const id = confirmandoExclusaoId;
+    const { error } = await excluirTarefa(id);
+    setConfirmandoExclusaoId(null);
+    if (error) return toast.error("Não foi possível excluir: " + error);
+    // Remove local sem esperar o realtime — mais responsivo.
+    setTarefas((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Tarefa excluída");
   }
 
   function onDragEnd(e: DragEndEvent) {
@@ -349,6 +374,8 @@ function KanbanPage() {
                 onMover={moverTarefa}
                 filtroStatus={filtroStatus}
                 dia={dia}
+                podeExcluir={podeExcluir}
+                onPedirExclusao={setConfirmandoExclusaoId}
               />
             ))}
           </div>
@@ -361,6 +388,24 @@ function KanbanPage() {
           </DragOverlay>
         </DndContext>
       )}
+
+      <AlertDialog open={!!confirmandoExclusaoId} onOpenChange={(open) => !open && setConfirmandoExclusaoId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. O tempo registrado, as camareiras vinculadas e as demandas de vistoria dessa tarefa também são
+              apagados junto. Solicitações do hóspede vinculadas a ela não são apagadas, só perdem o vínculo com a tarefa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmarExclusao} disabled={excluindo}>
+              {excluindo ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -373,6 +418,8 @@ function Coluna({
   onMover,
   filtroStatus,
   dia,
+  podeExcluir,
+  onPedirExclusao,
 }: {
   col: { id: ColunaId; label: string; tone: string };
   tarefas: TarefaRow[];
@@ -381,6 +428,8 @@ function Coluna({
   onMover: (id: string, c: ColunaId) => void;
   filtroStatus: string;
   dia: string;
+  podeExcluir: boolean;
+  onPedirExclusao: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   return (
@@ -396,7 +445,17 @@ function Coluna({
           <div className="text-xs text-muted-foreground text-center py-6">—</div>
         ) : (
           tarefas.map((t) => (
-            <DraggableCard key={t.id} t={t} unidade={unidades.get(t.unidade_id)} respMap={respMap} onMover={onMover} filtroStatus={filtroStatus} dia={dia} />
+            <DraggableCard
+              key={t.id}
+              t={t}
+              unidade={unidades.get(t.unidade_id)}
+              respMap={respMap}
+              onMover={onMover}
+              filtroStatus={filtroStatus}
+              dia={dia}
+              podeExcluir={podeExcluir}
+              onPedirExclusao={onPedirExclusao}
+            />
           ))
         )}
       </div>
@@ -411,6 +470,8 @@ function DraggableCard({
   onMover,
   filtroStatus,
   dia,
+  podeExcluir,
+  onPedirExclusao,
 }: {
   t: TarefaRow;
   unidade?: UnidadeRow;
@@ -418,11 +479,13 @@ function DraggableCard({
   onMover: (id: string, c: ColunaId) => void;
   filtroStatus: string;
   dia: string;
+  podeExcluir: boolean;
+  onPedirExclusao: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: t.id });
   return (
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners}>
-      <TarefaCard t={t} unidade={unidade} respMap={respMap} onMover={onMover} filtroStatus={filtroStatus} dia={dia} />
+      <TarefaCard t={t} unidade={unidade} respMap={respMap} onMover={onMover} filtroStatus={filtroStatus} dia={dia} podeExcluir={podeExcluir} onPedirExclusao={onPedirExclusao} />
     </div>
   );
 }
@@ -434,6 +497,8 @@ function TarefaCard({
   onMover,
   filtroStatus,
   dia,
+  podeExcluir,
+  onPedirExclusao,
   dragging,
 }: {
   t: TarefaRow;
@@ -442,6 +507,8 @@ function TarefaCard({
   onMover?: (id: string, c: ColunaId) => void;
   filtroStatus: string;
   dia: string;
+  podeExcluir?: boolean;
+  onPedirExclusao?: (id: string) => void;
   dragging?: boolean;
 }) {
   const ehLimpeza = t.tipo === "limpeza_checkout" || t.tipo === "limpeza_intermediaria";
@@ -492,6 +559,15 @@ function TarefaCard({
                 <Link to="/app/tarefas/$id" params={{ id: t.id }} search={{ from: "kanban", dia }}>
                   <DropdownMenuItem>Abrir tarefa</DropdownMenuItem>
                 </Link>
+                {podeExcluir && onPedirExclusao && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onPedirExclusao(t.id)}>
+                      <Trash2 className="size-4" />
+                      Excluir tarefa
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
