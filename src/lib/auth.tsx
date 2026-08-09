@@ -28,6 +28,8 @@ export const FRONT_DESK_ROLES: AppRole[] = [...OPERATOR_ROLES, "atendimento"];
 export const ALERTAS_ROLES: AppRole[] = [...FRONT_DESK_ROLES, "manager"];
 /** Enxerga indicadores da operação (sem atendimento — não é quem analisa métricas). */
 export const METRICAS_ROLES: AppRole[] = [...OPERATOR_ROLES, "manager"];
+/** Vê a trilha de auditoria (audit_log) — mesmo público de Métricas, espelha a policy ver_audit_log. */
+export const AUDITORIA_ROLES: AppRole[] = METRICAS_ROLES;
 
 const SOMENTE_EXECUCAO_ROLES: AppRole[] = ["camareira", "vistoriador"];
 

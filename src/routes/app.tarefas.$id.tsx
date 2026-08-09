@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAuth, FRONT_DESK_ROLES, OPERATOR_ROLES } from "@/lib/auth";
+import { useAuth, FRONT_DESK_ROLES, OPERATOR_ROLES, AUDITORIA_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +16,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronLeft, Play, Pause, CheckCircle2, Clock, KeyRound, Plus, Square, CheckSquare, ClipboardCheck, Pencil, Trash2, Check, X } from "lucide-react";
+import { ChevronLeft, Play, Pause, CheckCircle2, Clock, KeyRound, Plus, Square, CheckSquare, ClipboardCheck, Pencil, Trash2, Check, X, History } from "lucide-react";
 import { TAREFA_TIPO_LABEL, TAREFA_STATUS_LABEL, statusBadgeVariant, formatMin } from "@/lib/domain";
 import { toast } from "sonner";
 import { AtribuirResponsaveis } from "@/components/AtribuirResponsaveis";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
 import { useExcluirTarefa } from "@/lib/use-excluir-tarefa";
+import { useHistorico, type HistoricoItem } from "@/lib/use-historico";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import type { Database } from "@/lib/supabase/types";
 
 export const Route = createFileRoute("/app/tarefas/$id")({
@@ -49,6 +52,7 @@ function TarefaDetalhe() {
   const { hasAnyRole } = useAuth();
   const podeEditar = hasAnyRole(FRONT_DESK_ROLES);
   const podeExcluir = hasAnyRole(OPERATOR_ROLES);
+  const podeVerHistorico = hasAnyRole(AUDITORIA_ROLES);
 
   const [t, setT] = useState<Tarefa | null>(null);
   const [camareiras, setCamareiras] = useState<{ user_id: string; nome_completo: string }[]>([]);
@@ -211,6 +215,8 @@ function TarefaDetalhe() {
       </Card>
 
       <DemandasVistoria tarefaId={t.id} tarefaStatus={t.status} vistoriadorId={t.vistoriador_id} />
+
+      <HistoricoTarefa tarefaId={t.id} podeVer={podeVerHistorico} />
 
       <AlertDialog open={confirmandoExclusao} onOpenChange={setConfirmandoExclusao}>
         <AlertDialogContent>
@@ -413,6 +419,48 @@ function DemandasVistoria({ tarefaId, tarefaStatus, vistoriadorId }: { tarefaId:
               <Plus className="size-4" />
             </Button>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatarHistoricoTarefa(item: HistoricoItem): string {
+  if (item.acao === "status_change" && item.detalhes) {
+    const de = String(item.detalhes.de ?? "?");
+    const para = String(item.detalhes.para ?? "?");
+    return `Status alterado de "${TAREFA_STATUS_LABEL[de] ?? de}" para "${TAREFA_STATUS_LABEL[para] ?? para}"`;
+  }
+  if (item.acao === "excluida") return "Tarefa excluída";
+  return item.acao;
+}
+
+function HistoricoTarefa({ tarefaId, podeVer }: { tarefaId: string; podeVer: boolean }) {
+  const { itens, loading } = useHistorico("tarefas", tarefaId, podeVer);
+  if (!podeVer || loading) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <History className="size-4" />
+          Histórico
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {itens.length === 0 ? (
+          <div className="text-xs text-muted-foreground py-2">Nenhuma mudança registrada.</div>
+        ) : (
+          <ul className="space-y-2">
+            {itens.map((item) => (
+              <li key={item.id} className="text-sm border-b last:border-0 pb-2 last:pb-0">
+                <div>{formatarHistoricoTarefa(item)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {item.autorNome ?? "Sistema"} · {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ptBR })}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
     </Card>

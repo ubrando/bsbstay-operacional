@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAuth, OPERATOR_ROLES, FRONT_DESK_ROLES } from "@/lib/auth";
+import { useAuth, OPERATOR_ROLES, FRONT_DESK_ROLES, AUDITORIA_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Trash2, Plus, BedDouble } from "lucide-react";
-import { UNIDADE_STATUS_LABEL, TIPO_IMOVEL_LABEL, TIPO_CAMA_LABEL, statusBadgeVariant } from "@/lib/domain";
+import { ChevronLeft, Trash2, Plus, BedDouble, History, ClipboardList } from "lucide-react";
+import { UNIDADE_STATUS_LABEL, TIPO_IMOVEL_LABEL, TIPO_CAMA_LABEL, TAREFA_TIPO_LABEL, TAREFA_STATUS_LABEL, statusBadgeVariant } from "@/lib/domain";
 import { toast } from "sonner";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
+import { useHistorico, type HistoricoItem } from "@/lib/use-historico";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import type { Database } from "@/lib/supabase/types";
 
 export const Route = createFileRoute("/app/unidades/$id")({
@@ -59,6 +62,7 @@ function UnidadeDetalhe() {
   const { hasAnyRole } = useAuth();
   const podeGerenciar = hasAnyRole(OPERATOR_ROLES);
   const podeAtualizarStatus = podeGerenciar || hasAnyRole(FRONT_DESK_ROLES) || hasAnyRole(["vistoriador"]);
+  const podeVerHistorico = hasAnyRole(AUDITORIA_ROLES);
 
   const [unidade, setUnidade] = useState<Unidade | null>(null);
   const [quartos, setQuartos] = useState<Quarto[]>([]);
@@ -319,6 +323,10 @@ function UnidadeDetalhe() {
       </Card>
 
       <QuartosConfig unidadeId={unidade.id} quartos={quartos} podeGerenciar={podeGerenciar} />
+
+      <AtividadesRelacionadas unidadeId={unidade.id} />
+
+      <HistoricoUnidade unidadeId={unidade.id} podeVer={podeVerHistorico} />
     </div>
   );
 }
@@ -469,6 +477,128 @@ function QuartosConfig({ unidadeId, quartos, podeGerenciar }: { unidadeId: strin
               </Button>
             </div>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type AtividadeTarefa = { id: string; tipo: string; status: string; data_prevista: string };
+
+const LIMITE_ATIVIDADES = 20;
+
+function AtividadesRelacionadas({ unidadeId }: { unidadeId: string }) {
+  const [tarefas, setTarefas] = useState<AtividadeTarefa[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("tarefas")
+      .select("id,tipo,status,data_prevista")
+      .eq("unidade_id", unidadeId)
+      .order("data_prevista", { ascending: false })
+      .limit(LIMITE_ATIVIDADES);
+    if (error) console.error(error);
+    setTarefas(data ?? []);
+    setLoading(false);
+  }, [unidadeId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+  useRealtimeRefresh(["tarefas"], load);
+
+  if (loading) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <ClipboardList className="size-4" />
+          Atividades relacionadas
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {tarefas.length === 0 ? (
+          <div className="text-xs text-muted-foreground py-2">Nenhuma tarefa registrada pra essa unidade.</div>
+        ) : (
+          <ul className="space-y-1">
+            {tarefas.map((t) => (
+              <li key={t.id}>
+                <Link
+                  to="/app/tarefas/$id"
+                  params={{ id: t.id }}
+                  search={{ from: undefined, dia: undefined }}
+                  className="flex items-center justify-between gap-2 py-1.5 px-1 -mx-1 rounded text-sm hover:bg-accent/50"
+                >
+                  <span className="truncate">
+                    {TAREFA_TIPO_LABEL[t.tipo] ?? t.tipo} · {t.data_prevista}
+                  </span>
+                  <Badge variant={statusBadgeVariant(t.status)} className="shrink-0">
+                    {TAREFA_STATUS_LABEL[t.status] ?? t.status}
+                  </Badge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const CAMPO_LABEL_UNIDADE: Record<string, string> = {
+  status: "Status",
+  nome: "Nome",
+  endereco: "Endereço",
+  tempo_limpeza_min: "Tempo de limpeza",
+  ativo: "Ativa",
+  capacidade: "Capacidade",
+};
+
+function formatarValorUnidade(campo: string, valor: unknown): string {
+  if (campo === "status") return UNIDADE_STATUS_LABEL[String(valor)] ?? String(valor);
+  if (campo === "ativo") return valor ? "Sim" : "Não";
+  if (campo === "tempo_limpeza_min") return `${valor} min`;
+  return String(valor ?? "—");
+}
+
+function formatarHistoricoUnidade(item: HistoricoItem): string {
+  if (item.acao !== "atualizada" || !item.detalhes) return item.acao;
+  const partes = Object.entries(item.detalhes).map(([campo, v]) => {
+    const { de, para } = v as { de: unknown; para: unknown };
+    const label = CAMPO_LABEL_UNIDADE[campo] ?? campo;
+    return `${label}: "${formatarValorUnidade(campo, de)}" → "${formatarValorUnidade(campo, para)}"`;
+  });
+  return partes.join("; ");
+}
+
+function HistoricoUnidade({ unidadeId, podeVer }: { unidadeId: string; podeVer: boolean }) {
+  const { itens, loading } = useHistorico("unidades", unidadeId, podeVer);
+  if (!podeVer || loading) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <History className="size-4" />
+          Histórico de alterações
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {itens.length === 0 ? (
+          <div className="text-xs text-muted-foreground py-2">Nenhuma alteração registrada.</div>
+        ) : (
+          <ul className="space-y-2">
+            {itens.map((item) => (
+              <li key={item.id} className="text-sm border-b last:border-0 pb-2 last:pb-0">
+                <div>{formatarHistoricoUnidade(item)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {item.autorNome ?? "Sistema"} · {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ptBR })}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
     </Card>
