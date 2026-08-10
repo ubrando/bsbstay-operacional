@@ -25,8 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, KeyRound, Bed, Users as UsersIcon, Moon, Hash, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalIcon, ChevronLeft, ChevronRight, MoreVertical, Bed, Users as UsersIcon, Moon, Hash, Plus, Trash2 } from "lucide-react";
 import { TAREFA_TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_BORDA, TAREFA_STATUS_LABEL } from "@/lib/domain";
+import { SenhaPorta } from "@/components/SenhaPorta";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -69,7 +70,7 @@ type TarefaRow = {
   camareiras_ids?: string[];
 };
 
-type UnidadeRow = { id: string; codigo: string; nome: string };
+type UnidadeRow = { id: string; codigo: string; nome: string; senha_porta: string | null };
 
 // Colunas do Kanban (mapeamento status real → coluna visual)
 type ColunaId = "pendente" | "em_limpeza" | "em_vistoria" | "concluida";
@@ -168,7 +169,7 @@ function KanbanPage() {
     });
 
     const [{ data: us }, { data: ps }] = await Promise.all([
-      uIds.length ? supabase.from("unidades").select("id,codigo,nome").in("id", uIds) : Promise.resolve({ data: [] as UnidadeRow[] }),
+      uIds.length ? supabase.from("unidades").select("id,codigo,nome,senha_porta").in("id", uIds) : Promise.resolve({ data: [] as UnidadeRow[] }),
       rIds.size
         ? supabase.from("profiles").select("user_id,nome_completo").in("user_id", [...rIds])
         : Promise.resolve({ data: [] as { user_id: string; nome_completo: string }[] }),
@@ -612,12 +613,14 @@ function TarefaCard({
           )}
         </div>
 
-        {t.senha_apartamento && (
-          <div className="flex items-center gap-1 px-1.5 py-1 rounded bg-warning/15 border border-warning/40 text-xs font-mono font-bold">
-            <KeyRound className="size-3" />
-            {t.senha_apartamento}
-          </div>
-        )}
+        <SenhaPorta
+          tarefaId={t.id}
+          unidadeId={t.unidade_id}
+          dataPrevista={dia}
+          senhaTarefa={t.senha_apartamento}
+          senhaUnidade={unidade?.senha_porta}
+          compact
+        />
       </CardContent>
     </Card>
   );

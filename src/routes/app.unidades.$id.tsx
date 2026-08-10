@@ -39,6 +39,7 @@ type EditForm = {
   tempo_limpeza_min: number;
   observacoes: string;
   ativo: boolean;
+  senha_porta: string;
 };
 
 function formFromUnidade(u: Unidade): EditForm {
@@ -53,6 +54,7 @@ function formFromUnidade(u: Unidade): EditForm {
     tempo_limpeza_min: u.tempo_limpeza_min,
     observacoes: u.observacoes ?? "",
     ativo: u.ativo,
+    senha_porta: u.senha_porta ?? "",
   };
 }
 
@@ -116,6 +118,7 @@ function UnidadeDetalhe() {
         tempo_limpeza_min: form.tempo_limpeza_min,
         observacoes: form.observacoes.trim() || null,
         ativo: form.ativo,
+        senha_porta: form.senha_porta.trim() || null,
       })
       .eq("id", unidade.id);
     setBusy(false);
@@ -264,6 +267,16 @@ function UnidadeDetalhe() {
               <div className="space-y-1.5">
                 <Label htmlFor="observacoes">Observações</Label>
                 <Textarea id="observacoes" value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} rows={3} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="senha-porta">Senha da porta</Label>
+                <Input
+                  id="senha-porta"
+                  value={form.senha_porta}
+                  onChange={(e) => setForm({ ...form, senha_porta: e.target.value })}
+                  placeholder="Opcional"
+                />
               </div>
 
               <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">

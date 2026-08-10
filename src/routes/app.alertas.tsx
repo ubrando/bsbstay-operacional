@@ -5,7 +5,7 @@ import { useAuth, FRONT_DESK_ROLES, ALERTAS_ROLES } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, Lock, Bell, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Clock, Lock, Bell, CheckCircle2, KeyRound } from "lucide-react";
 import { TAREFA_TIPO_LABEL, SOLICITACAO_TIPO_LABEL } from "@/lib/domain";
 import { useAlertas, JANELA_PROXIMO_HORAS, type AlertaTarefa, type AlertaSolicitacao } from "@/lib/use-alertas";
 import { toast } from "sonner";
@@ -107,22 +107,32 @@ function Alertas() {
             {solicitacoesPendentes.map((s) => (
               <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{s.unidade?.nome ?? "—"}</div>
+                  <div className="font-medium truncate flex items-center gap-1.5">
+                    {s.tipo === "senha_porta" && <KeyRound className="size-3.5 text-warning shrink-0" />}
+                    {s.unidade?.nome ?? "—"}
+                  </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {s.unidade?.codigo} · {SOLICITACAO_TIPO_LABEL[s.tipo] ?? s.tipo}
+                    {s.unidade?.codigo} · {s.tipo === "senha_porta" ? "Senha da porta solicitada" : (SOLICITACAO_TIPO_LABEL[s.tipo] ?? s.tipo)}
                     {s.descricao && ` · ${s.descricao}`}
                   </div>
                 </div>
-                {podeAtender ? (
-                  <Button variant="outline" size="sm" onClick={() => marcarAtendida(s)} disabled={busyIds.has(s.id)}>
-                    <CheckCircle2 className="size-4 mr-1" />
-                    Atender
-                  </Button>
-                ) : (
-                  <Badge variant="outline" className="shrink-0">
-                    Pendente
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {s.tipo === "senha_porta" && (
+                    <Link to="/app/unidades/$id" params={{ id: s.unidadeId }}>
+                      <Button variant="outline" size="sm">
+                        Ver unidade
+                      </Button>
+                    </Link>
+                  )}
+                  {podeAtender ? (
+                    <Button variant="outline" size="sm" onClick={() => marcarAtendida(s)} disabled={busyIds.has(s.id)}>
+                      <CheckCircle2 className="size-4 mr-1" />
+                      Atender
+                    </Button>
+                  ) : (
+                    <Badge variant="outline">Pendente</Badge>
+                  )}
+                </div>
               </div>
             ))}
           </SecaoAlerta>

@@ -70,6 +70,7 @@ export const SOLICITACAO_TIPO_LABEL: Record<string, string> = {
   checkin_antecipado: "Check-in antecipado",
   checkout_tardio: "Check-out tardio",
   outro: "Outro",
+  senha_porta: "Senha da porta",
 };
 
 export const PRIORIDADE_BORDA: Record<string, string> = {

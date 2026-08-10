@@ -48,6 +48,7 @@ export type Database = {
           observacoes: string | null
           status: Database["public"]["Enums"]["unidade_status"]
           ativo: boolean
+          senha_porta: string | null
           created_at: string
           updated_at: string
         }
@@ -65,6 +66,7 @@ export type Database = {
           observacoes?: string | null
           status?: Database["public"]["Enums"]["unidade_status"]
           ativo?: boolean
+          senha_porta?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -309,7 +311,7 @@ export type Database = {
       tipo_imovel: "apartamento" | "casa" | "studio" | "cobertura" | "flat"
       tipo_cama: "casal" | "solteiro" | "queen" | "king" | "beliche" | "sofa_cama" | "berco"
       metodo_entrada: "email" | "app" | "app_envio_dados" | "whatsapp" | "foto_cadastro"
-      solicitacao_tipo: "berco" | "cama_extra" | "enxoval_adicional" | "travesseiros_extras" | "checkin_antecipado" | "checkout_tardio" | "outro"
+      solicitacao_tipo: "berco" | "cama_extra" | "enxoval_adicional" | "travesseiros_extras" | "checkin_antecipado" | "checkout_tardio" | "outro" | "senha_porta"
       solicitacao_status: "pendente" | "atendida" | "cancelada"
     }
   }

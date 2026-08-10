@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar as CalIcon, ChevronLeft, ChevronRight, Play, Pause, CheckCircle2, KeyRound, ClipboardCheck } from "lucide-react";
+import { Calendar as CalIcon, ChevronLeft, ChevronRight, Play, Pause, CheckCircle2, ClipboardCheck } from "lucide-react";
 import { TAREFA_TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_BORDA, statusBadgeVariant, TAREFA_STATUS_LABEL } from "@/lib/domain";
+import { SenhaPorta } from "@/components/SenhaPorta";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { useDiaNavegacao, todayStr, shiftDay } from "@/lib/use-dia-navegacao";
 import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
@@ -32,7 +33,7 @@ type TarefaRow = {
   vistoriador_id: string | null;
 };
 
-type UnidadeRow = { id: string; codigo: string; nome: string };
+type UnidadeRow = { id: string; codigo: string; nome: string; senha_porta: string | null };
 
 const TODOS = "todos";
 
@@ -72,7 +73,7 @@ function MinhasTarefas() {
     const uIds = [...new Set(minhas.map((t) => t.unidade_id))];
     const tIds = minhas.map((t) => t.id);
     const [{ data: us }, { data: demandas }] = await Promise.all([
-      uIds.length ? supabase.from("unidades").select("id,codigo,nome").in("id", uIds) : Promise.resolve({ data: [] as UnidadeRow[] }),
+      uIds.length ? supabase.from("unidades").select("id,codigo,nome,senha_porta").in("id", uIds) : Promise.resolve({ data: [] as UnidadeRow[] }),
       tIds.length
         ? supabase.from("vistoria_demandas").select("tarefa_id,concluido").in("tarefa_id", tIds)
         : Promise.resolve({ data: [] as { tarefa_id: string; concluido: boolean }[] }),
@@ -250,12 +251,7 @@ function TarefaItem({
           </Badge>
         )}
 
-        {t.senha_apartamento && (
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-warning/15 border border-warning/40 text-sm font-mono font-bold w-fit">
-            <KeyRound className="size-4" />
-            {t.senha_apartamento}
-          </div>
-        )}
+        <SenhaPorta tarefaId={t.id} unidadeId={t.unidade_id} dataPrevista={dia} senhaTarefa={t.senha_apartamento} senhaUnidade={unidade?.senha_porta} />
 
         {demandasPendentes > 0 && (
           <div className="flex items-center gap-1.5 text-sm text-warning">

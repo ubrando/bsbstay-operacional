@@ -34,6 +34,7 @@ function NovaUnidade() {
   const [capacidade, setCapacidade] = useState(2);
   const [tempoLimpezaMin, setTempoLimpezaMin] = useState(90);
   const [observacoes, setObservacoes] = useState("");
+  const [senhaPorta, setSenhaPorta] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   if (!podeCriar) {
@@ -68,6 +69,7 @@ function NovaUnidade() {
         capacidade,
         tempo_limpeza_min: tempoLimpezaMin,
         observacoes: observacoes.trim() || null,
+        senha_porta: senhaPorta.trim() || null,
       })
       .select("id")
       .single();
@@ -157,6 +159,16 @@ function NovaUnidade() {
             <div className="space-y-1.5">
               <Label htmlFor="observacoes">Observações</Label>
               <Textarea id="observacoes" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={3} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="senha-porta">Senha da porta</Label>
+              <Input
+                id="senha-porta"
+                value={senhaPorta}
+                onChange={(e) => setSenhaPorta(e.target.value)}
+                placeholder="Opcional"
+              />
             </div>
 
             <Button type="submit" disabled={salvando} className="w-full">

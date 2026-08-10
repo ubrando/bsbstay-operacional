@@ -16,10 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronLeft, Play, Pause, CheckCircle2, Clock, KeyRound, Plus, Square, CheckSquare, ClipboardCheck, Pencil, Trash2, Check, X, History } from "lucide-react";
+import { ChevronLeft, Play, Pause, CheckCircle2, Clock, Plus, Square, CheckSquare, ClipboardCheck, Pencil, Trash2, Check, X, History } from "lucide-react";
 import { TAREFA_TIPO_LABEL, TAREFA_STATUS_LABEL, statusBadgeVariant, formatMin } from "@/lib/domain";
 import { toast } from "sonner";
 import { AtribuirResponsaveis } from "@/components/AtribuirResponsaveis";
+import { SenhaPorta } from "@/components/SenhaPorta";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { useMudarStatusTarefa } from "@/lib/use-mudar-status-tarefa";
 import { useExcluirTarefa } from "@/lib/use-excluir-tarefa";
@@ -43,7 +44,9 @@ export const Route = createFileRoute("/app/tarefas/$id")({
   }),
 });
 
-type Tarefa = Database["public"]["Tables"]["tarefas"]["Row"] & { unidades?: { nome: string; codigo: string } | null };
+type Tarefa = Database["public"]["Tables"]["tarefas"]["Row"] & {
+  unidades?: { nome: string; codigo: string; senha_porta: string | null } | null;
+};
 
 function TarefaDetalhe() {
   const { id } = Route.useParams();
@@ -63,7 +66,7 @@ function TarefaDetalhe() {
   const { excluirTarefa, excluindo } = useExcluirTarefa();
 
   async function load() {
-    const { data } = await supabase.from("tarefas").select("*, unidades:unidade_id(nome, codigo)").eq("id", id).maybeSingle();
+    const { data } = await supabase.from("tarefas").select("*, unidades:unidade_id(nome, codigo, senha_porta)").eq("id", id).maybeSingle();
     setT(data as Tarefa | null);
 
     const { data: camRows } = await supabase.from("tarefa_camareiras").select("user_id").eq("tarefa_id", id);
@@ -161,15 +164,15 @@ function TarefaDetalhe() {
               </div>
               <div>{formatMin(tempoTotal)}</div>
             </div>
-            {t.senha_apartamento && (
-              <div>
-                <div className="text-muted-foreground text-xs flex items-center gap-1">
-                  <KeyRound className="size-3.5" /> Senha
-                </div>
-                <div className="font-mono font-bold">{t.senha_apartamento}</div>
-              </div>
-            )}
           </div>
+
+          <SenhaPorta
+            tarefaId={t.id}
+            unidadeId={t.unidade_id}
+            dataPrevista={t.data_prevista}
+            senhaTarefa={t.senha_apartamento}
+            senhaUnidade={t.unidades?.senha_porta}
+          />
 
           {podeEditar && (
             <div className="flex gap-2 flex-wrap">
