@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Building2 } from "lucide-react";
+import { Plus, Search, Building2, KeyRound } from "lucide-react";
 import { UNIDADE_STATUS_LABEL, TIPO_IMOVEL_LABEL, statusBadgeVariant } from "@/lib/domain";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import type { Database } from "@/lib/supabase/types";
@@ -16,7 +16,10 @@ export const Route = createFileRoute("/app/unidades/")({
   component: UnidadesLista,
 });
 
-type UnidadeRow = Pick<Database["public"]["Tables"]["unidades"]["Row"], "id" | "codigo" | "nome" | "regiao" | "tipo" | "status" | "ativo">;
+type UnidadeRow = Pick<
+  Database["public"]["Tables"]["unidades"]["Row"],
+  "id" | "codigo" | "nome" | "regiao" | "tipo" | "status" | "ativo" | "senha_porta"
+>;
 
 const TODAS_REGIOES = "__todas__";
 const TODOS_STATUS = "__todos__";
@@ -32,7 +35,10 @@ function UnidadesLista() {
   const [status, setStatus] = useState(TODOS_STATUS);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from("unidades").select("id,codigo,nome,regiao,tipo,status,ativo").order("nome", { ascending: true });
+    const { data, error } = await supabase
+      .from("unidades")
+      .select("id,codigo,nome,regiao,tipo,status,ativo,senha_porta")
+      .order("nome", { ascending: true });
     if (error) console.error(error);
     setUnidades(data ?? []);
     setLoading(false);
@@ -137,6 +143,11 @@ function UnidadesLista() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {!u.senha_porta && (
+                    <span title="Sem senha da porta cadastrada">
+                      <KeyRound className="size-4 text-warning" />
+                    </span>
+                  )}
                   {!u.ativo && (
                     <Badge variant="outline" className="text-muted-foreground">
                       Inativa

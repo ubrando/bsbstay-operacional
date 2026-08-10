@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth, OPERATOR_ROLES } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft } from "lucide-react";
 import { TIPO_IMOVEL_LABEL } from "@/lib/domain";
+import { gerarProximosCodigos } from "@/lib/proximo-codigo-unidade";
 import { toast } from "sonner";
 import type { Database } from "@/lib/supabase/types";
 
@@ -24,7 +25,7 @@ function NovaUnidade() {
   const { hasAnyRole } = useAuth();
   const podeCriar = hasAnyRole(OPERATOR_ROLES);
 
-  const [codigo, setCodigo] = useState("");
+  const [codigoGerado, setCodigoGerado] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [endereco, setEndereco] = useState("");
   const [regiao, setRegiao] = useState("");
@@ -36,6 +37,12 @@ function NovaUnidade() {
   const [observacoes, setObservacoes] = useState("");
   const [senhaPorta, setSenhaPorta] = useState("");
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    gerarProximosCodigos(1)
+      .then(([codigo]) => setCodigoGerado(codigo))
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Falha ao gerar código interno."));
+  }, []);
 
   if (!podeCriar) {
     return (
@@ -51,15 +58,19 @@ function NovaUnidade() {
   }
 
   async function salvar() {
-    if (!codigo.trim() || !nome.trim() || !endereco.trim() || !regiao.trim()) {
-      toast.error("Preencha código, nome, endereço e região.");
+    if (!codigoGerado) {
+      toast.error("Aguarde o código interno ser gerado.");
+      return;
+    }
+    if (!nome.trim() || !endereco.trim() || !regiao.trim()) {
+      toast.error("Preencha nome, endereço e região.");
       return;
     }
     setSalvando(true);
     const { data, error } = await supabase
       .from("unidades")
       .insert({
-        codigo: codigo.trim(),
+        codigo: codigoGerado,
         nome: nome.trim(),
         endereco: endereco.trim(),
         regiao: regiao.trim(),
@@ -100,10 +111,15 @@ function NovaUnidade() {
             }}
             className="space-y-4"
           >
+            <div className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+              Código interno: <span className="font-mono font-medium text-foreground">{codigoGerado ?? "gerando..."}</span> (gerado
+              automaticamente)
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="codigo">Código</Label>
-                <Input id="codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+                <Label htmlFor="nome">Nome</Label>
+                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="tipo">Tipo</Label>
@@ -120,11 +136,6 @@ function NovaUnidade() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="nome">Nome</Label>
-              <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
             </div>
 
             <div className="space-y-1.5">
@@ -171,7 +182,7 @@ function NovaUnidade() {
               />
             </div>
 
-            <Button type="submit" disabled={salvando} className="w-full">
+            <Button type="submit" disabled={salvando || !codigoGerado} className="w-full">
               {salvando ? "Salvando..." : "Cadastrar unidade"}
             </Button>
           </form>

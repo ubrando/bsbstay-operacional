@@ -49,6 +49,7 @@ export type Database = {
           status: Database["public"]["Enums"]["unidade_status"]
           ativo: boolean
           senha_porta: string | null
+          nome_ayrton: string | null
           created_at: string
           updated_at: string
         }
@@ -67,6 +68,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["unidade_status"]
           ativo?: boolean
           senha_porta?: string | null
+          nome_ayrton?: string | null
           created_at?: string
           updated_at?: string
         }
